@@ -247,6 +247,40 @@ score_sprite_dest=&34B0
   \ xxxxN final digit, always 0
   LDA #0:JMP plot_score
 
+\\ Scoring - check for extra player
+\\ Called from: Calculate the Score 
+\\ routine was moved from SS-01 to go with score routines here
+\\ TODO - monitor use of exg3 location/flag, move to variable
+.extra_player_check
+.exg 
+{
+  LDA #1:BIT exg3:BNE exg1
+  LDY sc+2:CPY #5:BMI exg2
+  ORA exg3:STA exg3:JSR exg4
+.exg1 
+  LDA #2:BIT exg3:BNE exg2
+  LDY sc+2:CPY #&10:BMI exg2      \ if score over 10000?
+  ORA exg3:STA exg3:JMP exg4      \ then store in exg3
+.exg2 
+  RTS:
+.*exg3 
+  EQUB 0
+.exg4 
+  JSR mini
+  LDA #220:STA sound_note_volume      \  &2DFC
+  LDX #LO(sound_note):LDY#HI(sound_note)   
+  LDA#7:JSR osword                    \ OSWORD - A=7 SOUND command at &2DF8
+  INC gex+1:CLC
+  LDA gex+2:ADC #&18                  \ set sprite screen position one right
+  STA gex+2:BCC exg5
+      INC gex+3
+.exg5 
+  RTS
+}
+\\ End of Scoring - check for extra player
+
+
+
 
 \\ Delay timer routine, uses vsync 20ms delay
 \\ input in A=n, Y preserved, n x 20ms delay
@@ -417,9 +451,52 @@ score_sprite_dest=&34B0
 .key 
   LDA #&81:LDY #&FF:JSR osbyte      \ OSBYTE 129 Read key, keyboard scan for X (value?)
   INX:RTS                           \ X is &FF is pressed, so INX to 0, return
-  INX:RTS               \ AF 7/6/21 added padding to align diffs, dead code
-  \ ]:VDU11:PRINT~P%;:
-  \ P%=&1778:
-  \ [OPTZ
+\ INX:RTS               \ AF 7/6/21 added padding to align diffs, dead code
+
+
+\\ Check Key presses for user input
+\\ Called from main loop after all screen routines, moved from SS-01
+\\ Calls JSR key, OSBYTE
+\\ Note this writes OSWORD vector at &20C, turning sound on and off.
+\\ checking for R, S, Q on keyboard
+.check_key_press
+.opt 
+{
+.checkQkey
+  LDX #&EF:JSR key:BNE op1          \ EF=-17 INKEY Q, Quiet
+  LDA #LO(mute):STA &20C      \ rewrite OSWORD vector to below .mute
+  LDA #HI(mute):STA &20D
+.op1 
+.checkSkey
+  LDX #&AE:JSR key:BNE op2           \ AE=-82 INKEY S, Sound
+  LDA soun:STA &20C:
+  LDA soun+1:STA &20D
+.op2 
+.checkRkey
+  LDX #&CC:JSR key:BNE op5          \ CC=-52 INKEY R, Rest
+.op3  
+  LDA #&81:LDY #1:LDX #0:JSR osbyte:  \OSBYTE 129 Read key, scan for 1s, keyboard scan for X (value?)
+  BCS op3:     \If Carry is set, no key, loop
+  CPX #82:    \82 = R
+  BEQ op3     \If R pressed, loop, else RTS
+.op5 
+.checkKeyComplete
+  RTS
+  
+.mute                               \ OSWORD vector points here when Q/mute
+    CMP #07:BEQ op5                 \ exit if OSWORD &07
+.mu1 
+  JMP(soun)
+}
+\TODO move this to a memory location, is populated on game startup
+.soun                               \ OSWORD vector restored from here
+  EQUW &E7EB
+
+\\ End of Check Key presses for user input
+
+
+
+
+
   .end_SS_03
   PRINT ".end_SS_03 = ", ~end_SS_03

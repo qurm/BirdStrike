@@ -104,9 +104,8 @@
 \    JSR gun
 .mg
 .move_gun
-    JSR gun
-    \ RTS: EQUW gun                     \ address of .gun  &28D3
-
+    NOP                                 \ SMC set to RTS to disable
+    JSR gun                             \ address of .gun  &28D3
     LDA #&81:LDY #&FF:LDX #&BD          \ http://beebwiki.mdfs.net/OSBYTE_%2681
     JSR osbyte                          \ check for "X" move right
     INX:BEQ r
@@ -204,43 +203,37 @@ gun_sprite_length=&27               \ &27=40 bytes
 
 \\ New bullet, nb, player fires?
 \\ Called from main loop after Move Bullet
-\\ Calls JSR fpat, s5 plot_bullet_sprite
+\\ Calls (JSR fpat), s5 plot_bullet_sprite
 \\ Inputs
 \\ Outputs
 \\ Sets values for bulst, bfg, sc (score)
+\\TODO is bfg still in use?
 .new_bullet
-.nb         \ first instruction is in G binary file, changed to RTS, &60 in gun_hit_display
+.nb NOP                                 \ SMC changed to RTS, &60 in gun_hit_display
     LDA #1
-    \RTS:EQUB &01                       \ SMC for LDA #1
-    BIT bfg                             \ test can fire again?
+    BIT bfg                             \ test can fire again?  Not used, replaced by fp0 counter?
     BNE nwb0
     LDA #&81:LDY#&FF:LDX#&B6           \ TODO changed LDX#&A6 to LDX#&B6 to fix player firing  
     JSR osbyte                         \ OSBYTE 129 Read key, keyboard scan for ENTER -74
-    INX:BEQ nwb1
-    \ AF 7/6/21 align to published
-    \ was LDA #&FD:AND bfg:STA bfg
-    LDA #&00::STA fp0 : RTS             \ SMC updates fp0
+    INX:BEQ nwb1                        \ if pressed, fire
+
+    LDA #&00:STA fp0 \: RTS             \ SMC updates fp0
 .nwb0 
     RTS
+.fp0 
+    EQUB 0                        \ fp0 counter modified below
 
-    \ AF 7/6/21 align to published
-    \ was LDA#2:BIT bfg:BNE nwb0:LDY#255
 .nwb1 
     \ LDA #2:BIT bfg
-    JMP fpat: EQUB bfg                  \ fpat prior to fp0 above
 \\\\\\\\\\\\\\\\ fpat \\\\\\\\\\\\\\\\
-\  LDA fp0:BEQ fp1             \ decrement counter, return if > 0
-\  DEC fp0:RTS
-\.fp1 
-\  LDA #18:STA fp0             \ reset counter to 18
+    LDA fp0:BEQ fp1             \ decrement counter, return if > 0
+    DEC fp0:RTS
+.fp1 
+   LDA #18:STA fp0             \ reset counter to 18
 \  JMP nwb_patch_return        \ &297D
-\.fp0 
-\  EQUB 0                      \ modified above
 \\\\\\\\\\\\\\\\ end fpat \\\\\\\\\\\\\\\\
 
-    BNE nwb0
-.nwb_patch_return
-    LDY #&FF
+    LDY #&FF                            \ proceed to fire again
 .nwb2 
     INY:INY:INY:INY
     LDA(bulst),Y:BNE nwb2               \ search for unused list entry, bulst[2] = 0
@@ -255,8 +248,8 @@ gun_sprite_length=&27               \ &27=40 bytes
     JSR plot_bullet_sprite               \ plot_bullet_sprite
     LDA #3:ORA bfg:STA bfg               \ set bfg bit0,1 shows 2 bullets
     LDA #1:ORA sc:STA sc
-    LDA #7:LDY #&2D:LDX #&D0             \ OSWORD - A=7 SOUND command at &2DD0
-    JMP osword
+    LDX #LO(sound_bullet):LDY#HI(sound_bullet)  \ OSWORD - A=7 SOUND command at &2DD0  sound_bullet
+    LDA #7:JMP osword
 
 \ s5 Sprite/screen memory movement for bombs, bullets?
 \ uses EOR plotting, from sf, to st & sd (across 2 MODE 2 rows) 
@@ -296,8 +289,8 @@ gun_sprite_length=&27               \ &27=40 bytes
 \\ Determines if level is complete if no planes remaining.
 \ pflg = plane flag - where init?
 .np 
+    NOP                             \ SMC in gun_hit_display, set to RTS
     LDA pflg                        \ AF 7/6/21
-    \ RTS: EQUB pflg                \ SMC in gun_hit_display
     CMP #01:BPL nw                  \ if any flag bit set, then RTS
     DEC ti:BNE nw                   \ ti=ti-1, if timer <> 0 then RTS
     LDA ti+1:STA ti:                \ timer=0 so reset
@@ -386,10 +379,12 @@ plane_sprite_addr  = &2F00              \ base for 4 levels of plane
     ASLA:STA(bulst),Y:BNEnh+3           \always
 .o 
     LDA #25:STA exp:
-    LDA #&D8:STA(bulst),Y:TAX
-    LDA #7:LDY #&2D:JSR osword      \ OSWORD - A=7 SOUND command at &2DD8
-    PLA:TAY:
-    LDA#2:ORA sc:STA sc
+    LDA #LO(sound_plane_hit)
+    STA(bulst),Y:TAX                \ indrect way to LDX #LO(sound_plane_hit), store &D8 in bulst to show hit.
+    LDY#HI(sound_plane_hit)   
+    LDA #7:JSR osword      \ OSWORD - A=7 SOUND command at &2DD8 sound_plane_hit
+    PLA:TAY
+    LDA #2:ORA sc:STA sc
     JSR pp                          \ plot plane
     JMP pxp
 .nh INY:INY:INY:                    \ plane not hit
@@ -446,19 +441,38 @@ plane_sprite_addr  = &2F00              \ base for 4 levels of plane
     LDA pos+1:ADC #2:STA pos+1
 .lft                                \ move left?
     \LDA exp:ROLA
-     JMP nlr                   \TODO was LDA exp:ROLA - now is patched code doing similar??
-     \ better plane movement?
+    \\ JMP nlr                   \TODO was LDA exp:ROLA - now is patched code doing similar??
+    \\ start inserted patch from SS-01
+    \\ better plane movement added later
+    LDA tog:BEQ enlr                \ check toggle, skip alternate cycles.
+    LDA exp:BPL rt
+    DEC psta:SEC:               \ Move left subtract 8
+    LDA pos:SBC#8:STA pos
+    BCS enlr
+        DEC pos+1:JMP enlr
+.rt                             \ Move right add 8
+    INC psta:CLC
+    LDA pos:ADC #8:STA pos
+    BCC enlr
+        INC pos+1
+.enlr 
+    LDA #01:EOR tog:STA tog
+    JMP fo                          \ plane plotting
+.tog 
+    EQUB 0                       \ toggle byte, 0/1
+  \\ end inserted patch from SS-01
 
-    BCC rgt            \ exp determines right or left
-    DEC psta
-    LDA pos:SBC #8:STA pos:BCS fo   \ left pos=pos-8
-        DEC pos+1
-        JMP fo
-.rgt                                \ move right?
-    INC psta:ROLA:BCC fo:
-    CLC:
-    LDA pos:ADC#8:STA pos:BCC fo    \ right pos=pos+8
-    INC pos+1
+    \\ lines below NEVER RUN - TODO CHECK
+\                BCC rgt            \ exp determines right or left
+\                DEC psta
+\                LDA pos:SBC #8:STA pos:BCS fo   \ left pos=pos-8
+\                    DEC pos+1
+\                    JMP fo
+\            .rgt                                \ move right?
+\                INC psta:ROLA:BCC fo:
+\                CLC:
+\                LDA pos:ADC#8:STA pos:BCC fo    \ right pos=pos+8
+\                INC pos+1
 \\ end Plane
 
 \\ fo plots plane, writes data back to list 
@@ -523,9 +537,8 @@ plane_sprite_addr  = &2F00              \ base for 4 levels of plane
 
 \ New bombs
 .nbo 
-    \ LDA/RTS Gets changed to $A9 (LDA#) by gun_hit_display
+    NOP                             \  Gets changed to RTS by gun_hit_display
     LDA #&C0
-    \ RTS: EQUB &C0                   \ TODO align to published.
     BIT bofg:BNE nbo4
     DEC bofg:BNE nbo4
     LDY #255
@@ -579,7 +592,12 @@ plane_sprite_addr  = &2F00              \ base for 4 levels of plane
 .ra3 
     SBC #&10:BPL ra3:ADC ra3+1: \IFM - SBC#10->SBC#&10 \[note: .ra3 has SBC #0 (disassembly is #&10)]
     RTS
+.end_GG_02_code
+PRINT ".end_GG_02_code = ", ~end_GG_02_code
 
+
+\\ Fixed postion
+ORG &2D0A
 \ this is all zeroed in start_game 2D0A to 2D5E
 .bullet_list                \ pointer to this in zero page bulst=&8A
     EQUB &08                \ contains max no of bullets 8
@@ -598,7 +616,8 @@ plane_sprite_addr  = &2F00              \ base for 4 levels of plane
     EQUB &00,&00,&00,&00,&00,&00,&00,&00
     EQUB &00,&00,&00                    \ padding
 \ IFM - L2D47 - sprite pointers? Maybe more?
-ORG &2D47
+
+\ORG &2D47
 
 \.L2D47
 .bomb_list                \ pointer to this in zero page bost=&8C
@@ -622,8 +641,8 @@ ORG &2D47
     EQUB    LO(bullet_sprite_addr)     \ Bullet sprite pointer low byte bullet_sprite_addr
     EQUB    HI(bullet_sprite_addr)     \ Bullet sprite pointer high byte
 .bof                         
-    EQUB    $50      \ Enemy bomb sprite pointer low byte
-    EQUB    $23      \ Enemy bomb sprite pointer high byte
+    EQUB    LO(bomb_sprite_addr)       \ Enemy bomb sprite pointer low byte
+    EQUB    HI(bomb_sprite_addr)       \ Enemy bomb sprite pointer high byte
 
 .sc                     \ Score Counter flag byte
     EQUB    $00
@@ -688,6 +707,6 @@ ORG &2D80
     EQUB    &49,&00
 .sound_note_pitch           \ 2DFE
     EQUB    &0F,&00
-    
+
 .end_GG_02
 PRINT ".end_GG-02 = ", ~end_GG_02

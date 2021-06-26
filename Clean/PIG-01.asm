@@ -95,14 +95,9 @@
 .h8 DEY:
 .h9 DEY:DEY:
 .h10 DEY:DEY:BNE h6
-.h7                              \ modify these routines, replacing RTS with the correct opcode
-   LDA #&20:STA mg               \ #&20 = JSR opcode
-   LDA #&A5:STA np               \ #&A5 = LDA ZP opcode
-   LDA #&A9:STA nbo:STA nb       \ #&A9 = LDA# opcode
-   \ TODO differences with Ians source
-   \\ differences to G dissasm
-   \    22F4   CE 56 1D   DEC &1D56
-   \    22F7   F0 0F      BEQ &2308
+.h7                              \ modify these routines, replacing RTS with the NOP opcode, &EA
+   LDA #&EA:STA nbo:STA nb:STA np :STA mg
+
    \ AF 6/6/2021 removed this line
    \  DEC gex+1:BEQ govX                   \ renamed govX but .gov is in SS, so cannot BEQ that far
                                         \ is this realy used?

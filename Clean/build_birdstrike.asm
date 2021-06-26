@@ -19,10 +19,10 @@
 \ Build instructions, assume that Beebasm is in the folder specified.
 \ Each option produces output as per the Beebasm options. 
 \ beebasm -i build_birdstrike.asm
-\ ..\beebasm-1.09\beebasm -i build_birdstrike.asm 
-\ ..\beebasm-1.09\beebasm.exe  -vc -i build_birdstrike.asm -v > build_output.asm
-\ ..\beebasm-1.09\beebasm.exe  -vc -i build_birdstrike.asm -d >labels.txt
-\ ..\beebasm-1.09\beebasm -i build_birdstrike.asm -do BS1v1.ssd -boot BIRDS 
+\ ..\..\beebasm-1.09\beebasm -i build_birdstrike.asm 
+\ ..\..\beebasm-1.09\beebasm.exe  -vc -i build_birdstrike.asm -v > build_output.asm
+\ ..\..\beebasm-1.09\beebasm.exe  -vc -i build_birdstrike.asm -d >labels.txt
+\ ..\..\beebasm-1.09\beebasm -i build_birdstrike.asm -do BS_Clean.ssd -boot BIRDS 
 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 
@@ -184,8 +184,8 @@ INCBIN "X.bin"          \ sprite, data, variables file &1900 to &1E00, &500 byte
 PRINT ".end_X = ", ~end_X
 
 
-
-ORG &281D
+\ ORG &281D
+ORG &2600
 INCLUDE "GG-02.asm"
 \ starts at .def_log_colour
 \ 281D to 2D09

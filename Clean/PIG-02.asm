@@ -282,12 +282,13 @@
    LDA plf: STA sf                     \ initialise zp locations
    LDA plf+1: STA sf+1
    LDA #&1F: STA modify_plane_sprite_length+1      \&2C1E
-   LDA #%11100000: STA no              \ store &E0 %11100000 in temp zp
+   LDA #%11000000: STA no              \ store &E0 %11100000 in temp zp
    LDY #&00
 \.L25E7
 
 \ loop loads table of values that are source and 
 \ destination sprite addresses, writes to zp, runs JSR pp.
+\ assumes that source addresses are < &3000, destinations are > &3000, tested with BIT #%11000000
 \ BIT sets the Z flag as though the value in the address tested were ANDed with the accumulator. 
 \ The N and V flags are set to match bits 7 and 6 respectively in the value stored at the tested address.
 .draw_backgnd_sprite_loop

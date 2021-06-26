@@ -14,66 +14,26 @@
   \ AF: Last few chars of this string may have been used for padding to adjust some location
   EQUS "Thanks David,Ian,Martin,Mum,Dad,Susi C"
 
-\\ Check Key presses for user input
-\\ Called from main loop after all screen routines
-\\ Calls JSR key, OSBYTE
-\\ Note this writes OSWORD vector at &20C, turning sound on and off.
-\\ checking for R, S, Q on keyboard
-.check_key_press
-.opt 
-{
-.checkQkey
-  LDX #&EF:JSR key:BNE op1          \ EF=-17 INKEY Q, Quiet
-  LDA #LO(mute):STA &20C      \ rewrite OSWORD vector to below .mute
-  LDA #HI(mute):STA &20D
-.op1 
-.checkSkey
-  LDX #&AE:JSR key:BNE op2           \ AE=-82 INKEY S, Sound
-  LDA soun:STA &20C:
-  LDA soun+1:STA &20D
-.op2 
-.checkRkey
-  LDX #&CC:JSR key:BNE op5          \ CC=-52 INKEY R, Rest
-.op3  
-  LDA #&81:LDY #1:LDX #0:JSR osbyte:  \OSBYTE 129 Read key, scan for 1s, keyboard scan for X (value?)
-  BCS op3:     \If Carry is set, no key, loop
-  CPX #82:    \82 = R
-  BEQ op3     \If R pressed, loop, else RTS
-.op5 
-.checkKeyComplete
-  RTS
-  
-.mute                               \ OSWORD vector points here when Q/mute
-    CMP #07:BEQ op5                 \ exit if OSWORD &07
-.mu1 
-  JMP(soun)
-}
-\TODO move this to a memory location, is populated on game startup
-.soun                               \ OSWORD vector restored from here
-  EQUW &E7EB
-
-\\ End of Check Key presses for user input
-
 \\ Check Plane right bounds, do movement?
-\\ Called from Plane function - as a patch?
-\\ TODO relocate this to the Plane routing
+\\ Called from GG-02 Plane function - as a patch?
+\\ TODO relocate this to the Plane routine in GG-02
 \\ Calls JSR fo (plane plotting)
-.nlr                \ Move enemy / check left bound
-{
-  LDA tog:BEQ enlr:LDA exp:BPL rt
-  DEC psta:SEC:LDA pos:SBC#8:STA pos:BCS enlr
-  DEC pos+1:JMP enlr
-.rt                 \ Check right bound
-  INC psta:CLC
-  LDA pos:ADC #8:STA pos
-  BCC enlr
-    INC pos+1
-.enlr 
-  LDA #01:EOR tog:STA tog
-  JMP fo                          \ plane plotting
-.tog 
-  EQUB 0                       \ toggle byte, 0/1
-}
+\        .nlr                \ Move enemy / check left bound
+\        {
+\          LDA tog:BEQ enlr:LDA exp:BPL rt
+\          DEC psta:SEC:LDA pos:SBC#8:STA pos:BCS enlr
+\          DEC pos+1:JMP enlr
+\        .rt                 \ Check right bound
+\          INC psta:CLC
+\          LDA pos:ADC #8:STA pos
+\          BCC enlr
+\            INC pos+1
+\        .enlr 
+\          LDA #01:EOR tog:STA tog
+\          JMP fo                          \ plane plotting
+\        .tog 
+\          EQUB 0                       \ toggle byte, 0/1
+\        }
 
 
 \\ fpat - Fire patch - bullet counter?
@@ -83,16 +43,16 @@
 \\ Inputs
 \\ Outputs
 \\ Sets values for fp0 counter
-.fpat
-{
-  LDA fp0:BEQ fp1             \ decrement counter, return if > 0
-  DEC fp0:RTS
-.fp1 
-  LDA #18:STA fp0             \ reset counter to 18
-  JMP nwb_patch_return        \ &297D
-}
-.fp0 
-  EQUB 0                      \ modified above
+\    .fpat
+\    {
+\      LDA fp0:BEQ fp1             \ decrement counter, return if > 0
+\      DEC fp0:RTS
+\    .fp1 
+\      LDA #18:STA fp0             \ reset counter to 18
+\      JMP nwb_patch_return        \ &297D
+\    }
+\    .fp0 
+\      EQUB 0                      \ modified above
 \\ End of fpat - Fire patch 
 
 \\ game_over - Display GAME OVER message, and 
@@ -124,7 +84,7 @@
 
 \\ Move plane patch or additional logic
 \\ Called from Move plane  see PIG-01
-\\ TODO Move this into calling routine
+\\ TODO Move this into calling routine  - is it used?
 .stp4 
   RTS
 .stp6 
@@ -134,36 +94,6 @@
   JMP fo+3
 \\ End of 
 
-\\ Scoring - check for extra player
-\\ Called from: Calculate the Score 
-\\ TODO - monitor use of exg3 location/flag, move to variable
-.extra_player_check
-.exg 
-{
-  LDA #1:BIT exg3:BNE exg1
-  LDY sc+2:CPY #5:BMI exg2
-  ORA exg3:STA exg3:JSR exg4
-.exg1 
-  LDA #2:BIT exg3:BNE exg2
-  LDY sc+2:CPY #&10:BMI exg2      \ if score over 10000?
-  ORA exg3:STA exg3:JMP exg4      \ then store in exg3
-.exg2 
-  RTS:
-.*exg3 
-  EQUB 0
-.exg4 
-  JSR mini
-  LDA #220:STA sound_note_volume      \  &2DFC
-  LDX #LO(sound_note):LDY#HI(sound_note)   
-  LDA#7:JSR osword                    \ OSWORD - A=7 SOUND command at &2DF8
-  INC gex+1:CLC
-  LDA gex+2:ADC #&18                  \ set sprite screen position one right
-  STA gex+2:BCC exg5
-      INC gex+3
-.exg5 
-  RTS
-}
-\\ End of Scoring - check for extra player
 
 
 \\ Bonus routine
