@@ -56,12 +56,13 @@
    RTS      \2244   60         RTS
 .h1 
    LDX #0:LDY#7:JSR def_log_colour           \ define background as white? temp flash.
-   LDA #7:LDY #&2D:LDX #&E0:JSR osword       \ Sound
+   LDA #7:LDY #HI(sound_player_hit):LDX #LO(sound_player_hit):JSR osword       \ Sound  sound_player_hit
    LDA #&FF:STA gex                          \ counter for explosion
    LDA #&60:STA nbo:STA np:STA mg:STA nb     \ this stores RTS in each routine, disabling them SMC
    JSR plot_gun_sprite                       \ un-draw sprite was .gun
    \ AF align to published as LDA #&1A , was LDA #&A
-   LDA #&1A:STA gun+4:LDA #&10:STA gun+3     \ modify code with sprite source as &1A10
+   LDA #HI(other_sprite_addr):STA gun+4
+   LDA #LO(other_sprite_addr):STA gun+3        \ modify code with sprite source as &1A10, gun_sprite_addr
    JMP plot_gun_sprite                       \ re-draw sprite was .gun, exit.
 .h12 
    DEC gex:LDA gex:CMP #254:BNE h3           \ gex, gun explosion, during which does not move etc
@@ -109,6 +110,9 @@
    LDA gex+2:SBC #&18                  \ set sprite screen position one left; was SBC#&20 
    \ AF 6/6/2021 changed to JMP, was :JSR mini
    STA gex+2:JMP mini
+
+.end_PIG_01
+PRINT ".end_PIG-01 = ", ~end_PIG_01
 
 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   
 \\ section is overwritten with data .nl, .tl, etc up to B%

@@ -13,11 +13,11 @@ These are a mix of BBC BASIC Assembler source code and some binary files contain
 Small sections of source code were only present in binary format and may later be recovered from the original tapes.  These have been reconstructed from disassembly.
 
 The source is hard to read in the original BASIC/Assembler files. 
-There are minimal comments and typically 2 or 3 character labels.  Working memory was very limited and the shortest possible files allowed for source and assembled code to both be held in RAM.  The game development started using the cassette tape file system and only the later files were developed on disk. 
+There are minimal comments and typically 2 or 3 character labels.  Working memory was very limited and the shortest possible files allowed for source and assembled code to both be held in RAM.  The game development started using the cassette tape file system and only the later files were developed on disk. Over the period I may have lost some of the earlier source, or just been unable to keep editing it all with limited space, so there are various patches and modifications to the older routines.
 
 
 ## Buildable source 
-The Build folder has a current (2021) version of the source files that can be built using Beebasm to produce a bootable disk image for use on the Beebem emulator or real BBC Micro.
+The Build folder has an alternative current (2021) version of the source files that can be built using Beebasm to produce a bootable disk image for use on the Beebem emulator or real BBC Micro.
 
 There are minor differences to the original source, mostly explained.  There are extensive explanations, comments, labels, & named constants, but no fixes or changes to the code.  It will build a byte-for-byte binary that is the same as the published tape version without the copy protection and tape file loader (which had music & instructions).
 
