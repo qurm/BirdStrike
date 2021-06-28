@@ -41,13 +41,8 @@
   JSR pg                    \ Move bird, was B%
   JSR gun_hit_display       \ Player Hit processing, was H%
   JSR sor                   \ gravestones, score?
-  JSR check_key_press      \ keyboard inputs, was opt
+  JSR check_key_press       \ keyboard inputs, was opt
 
-  \ TODO - commented 2 lines out to align to Iains disassembly
-  \ LDX #&8F:JSR key:BNE GO:      \ Check if ESC not pressed, then loop to .GO
-                                  \ Set Escape Enabled, Jump out and end.  
-  \ LDA #200:LDY #0:JMP osbyte     \ OSBYTE Escape key
-   \ TODO - add 1 line to align to Iains disassembly
   JMP GO
 
   EQUS "(c)A.E.Frigaard 1984 Hello!"
@@ -65,22 +60,44 @@
   LDA #32:STA de
   LDA #3:STA ti       \ ti=de+1 initial timer value
   LDA #42:STA ti+1    \ default timer value  was de+2:
-  LDA #2:STA bfg:LDA #&2D:STA bulst+1:STA bost+1:STA pls+1
-  LDA #&47:STA bost:LDA #&A:STA bulst:LDA #&13:STA pls
+  LDA #2:STA bfg
+
+  LDA #LO(bullet_list):STA bulst
+  LDA #HI(bullet_list):STA bulst+1
+  LDA #LO(bomb_list):STA bost
+  LDA #HI(bomb_list):STA bost+1
+  LDA #LO(plane_list):STA pls
+  LDA #HI(plane_list):STA pls+1
 
 \\ Setup screen colours - load palette
   LDX #15:LDY #7
 .co1 
   JSR def_log_colour           \ JSR call 8 times, decrementing X, was D%
   DEX: CPX #7:BNE co1
-  \  a9 13 20 ee ff 8a 20 ee ff 98 20 ee ff a9 20 20 ee ff 20 ee ff 4c ee ff a5 70 
 
   STX ra1          \ save X 7 in ra1
 
   LDA #player_live_init:STA gex+1        \\ player lives, 3
-  LDA #&2F:STA plf+1
+  \ LDA #&2F:STA plf+1
+  LDA #HI(plane_sprite_addr):STA plf+1    \ LO addresses set per game frame
   LDA #&F0:STA inb        \\ flag 1111 0000
-  LDA #0:STA tm+1
+  LDA #0:STA tm+1         \\ used for bomb list counter start (0),2,3 AF try 2
+
+\\    init, L1, L2, L3, ..
+\\ de   32, 30, 30, 28    \ -2 on odd levels
+\\ ti   03
+\\ ti+1 42
+\\ bfg? 02
+\\ tm
+\\ tm+1  0, 2, 2, 4, 4               \bomb list counter start 
+\\ ra?
+\\ tune
+\\ fc   00, 01, 02, 03
+\\ inb &F0,&EF,&EF,&EE,&EE,
+\\ gex+1 03         \player lives, no change
+
+
+\\ try one plane per level to speed up testing.
 
 \\ Begin Level (next frame)
 \\ TO DO - Iains fix here
@@ -92,8 +109,11 @@
   LDA fc:AND #1:BEQ b0      \ else if level is odd (1,3,5)
   DEC de:DEC de:            \ then decrement x 2 de
   DEC inb                   \ and decrement inb
-.b0 
-  INC tm+1:INC tm+1:        \ inc x 2 tm+1, this is default timer.
+\.b0                        \ IainFM: I also moved the .b0 label in SS-03.asm. That seems to have cured the bug, although I've not tested it to destruction yet!
+
+  INC tm+1:INC tm+1:        \ inc x 2 tm+1, this is default timer?  Add 2 more bomb per level?
+  \TODO check bounds, also only two bombs shown on level 1 even with 4
+.b0
   LDA #12:JSR oswrch        \ OSWRCH clear the screen
   LDA #154:LDX #20:JSR osbyte    \ OSBYTE Write to video ULA control register and OS copy 
   JSR plot_clouds                 \ Draw the clouds, was C%
@@ -103,19 +123,19 @@
 
   LDA #0:STA plane_kill_count:
   STA sc:STA ba+1
-  \  &54 bytes covers bullet_list is 7, plane_list, bomb_list
-  LDY #&54
+  \  &54 bytes covers bullet_list, plane_list, bomb_list - can extend this:
+  LDY #cloud_sprite_offset_list - bullet_list -1
 .b1 
   STA bullet_list,Y: DEY: BNE b1      \ clear &54 bytes at &2D0A (bullet_list set to 0)
   LDA tm+1:STA bomb_list              \ allow up to 2? bombs
-  LDA #6:STA bullet_list              \ allow up to 6 bullets
-  LDA #30:STA plane_list              \ allow up to 30 planes!
+  LDA #12:STA bullet_list              \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
+  LDA #30:STA plane_list              \ allow up to 7 x 4 byte planes
   note_screen_addr = &3088
-  gun_screen_addr = &3288
-  LDA #&30:STA not+1
-  LDA #&88:STA not
-  LDA #&80:STA gex+2
-  LDA #&32:STA gex+3:
+  gun_screen_addr = &3280             \ or 3288?
+  LDA #LO(note_screen_addr):STA not
+  LDA #HI(note_screen_addr):STA not+1
+  LDA #LO(gun_screen_addr):STA gex+2  \TO do - more related init below? is this needed?
+  LDA #HI(gun_screen_addr):STA gex+3:
   
   \\ draw initial player gun indicators
   LDX gex+1                   \ number of player guns
@@ -199,7 +219,7 @@
   LDA sc+2:ADC #0:STA sc+2
   JSR plane_hit             \ was X%   
 
-.s1         \ 1FFE   A9 40      LDA #&40
+.s1        
   LDA #&40:BIT sc:BEQ s4    \ bit 6 not set
   CLC:LDA #1 
 .wng                        \ score for plane wing 1 => 10
@@ -280,8 +300,6 @@ score_sprite_dest=&34B0
 \\ End of Scoring - check for extra player
 
 
-
-
 \\ Delay timer routine, uses vsync 20ms delay
 \\ input in A=n, Y preserved, n x 20ms delay
 \\ output original Y (also in A)
@@ -328,13 +346,13 @@ score_sprite_dest=&34B0
 
 \\ Patch for Move Plane - improved randomness
 \\ Called from mp
-\\ TODO move into mp routine
-.patch 
-  LDA ra1:BPL patch2:
-  LDA sd:EOR #&C0:STA sd          \ XOR top bit of address
-.patch2 
-  LDA de                         \dirn when above
-  RTS
+\\ DONE moved into mp routine
+\.patch 
+\  LDA ra1:BPL patch2:
+\  LDA sd:EOR #&C0:STA sd          \ XOR top bit of address
+\.patch2 
+\  LDA de                         \dirn when above
+\  RTS
 \\ End of Patch for Move Plane 
 
 
@@ -453,7 +471,6 @@ score_sprite_dest=&34B0
   INX:RTS                           \ X is &FF is pressed, so INX to 0, return
 \ INX:RTS               \ AF 7/6/21 added padding to align diffs, dead code
 
-
 \\ Check Key presses for user input
 \\ Called from main loop after all screen routines, moved from SS-01
 \\ Calls JSR key, OSBYTE
@@ -464,7 +481,7 @@ score_sprite_dest=&34B0
 {
 .checkQkey
   LDX #&EF:JSR key:BNE op1          \ EF=-17 INKEY Q, Quiet
-  LDA #LO(mute):STA &20C      \ rewrite OSWORD vector to below .mute
+  LDA #LO(mute):STA &20C            \ rewrite OSWORD vector to below .mute
   LDA #HI(mute):STA &20D
 .op1 
 .checkSkey
@@ -476,9 +493,9 @@ score_sprite_dest=&34B0
   LDX #&CC:JSR key:BNE op5          \ CC=-52 INKEY R, Rest
 .op3  
   LDA #&81:LDY #1:LDX #0:JSR osbyte:  \OSBYTE 129 Read key, scan for 1s, keyboard scan for X (value?)
-  BCS op3:     \If Carry is set, no key, loop
-  CPX #82:    \82 = R
-  BEQ op3     \If R pressed, loop, else RTS
+  BCS op3:        \If Carry is set, no key, loop
+  CPX #82:        \82 = R
+  BEQ op3         \If R pressed, loop, else RTS
 .op5 
 .checkKeyComplete
   RTS
@@ -491,10 +508,7 @@ score_sprite_dest=&34B0
 \TODO move this to a memory location, is populated on game startup
 .soun                               \ OSWORD vector restored from here
   EQUW &E7EB
-
 \\ End of Check Key presses for user input
-
-
 
 
 

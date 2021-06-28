@@ -322,7 +322,7 @@ gun_sprite_length=&27               \ &27=40 bytes
 \\  from explosion animation
 \\ actual plotting is in JSR pp
 \explosion_sprite_addr  = &1928          \ base for 3 animated sprites &30 long
-plane_sprite_addr  = &2F00              \ base for 4 levels of plane
+
 .pxp 
     LDA exp:BEQ nx              \ not explosion
 

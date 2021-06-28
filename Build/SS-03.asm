@@ -104,11 +104,12 @@
   LDA #0:STA plane_kill_count:
   STA sc:STA ba+1
   \  &54 bytes covers bullet_list is 7, plane_list, bomb_list
-  LDY #&54
+  LDY cloud_sprite_offset_list-bullet_list
+  \ LDY #&5C        \ originally &54
 .b1 
   STA bullet_list,Y: DEY: BNE b1      \ clear &54 bytes at &2D0A (bullet_list set to 0)
   LDA tm+1:STA bomb_list              \ allow up to 2? bombs
-  LDA #6:STA bullet_list              \ allow up to 6 bullets
+  LDA #8:STA bullet_list              \ allow up to 2 (x 4 byte) bullets
   LDA #30:STA plane_list              \ allow up to 30 planes!
   note_screen_addr = &3088
   gun_screen_addr = &3288

@@ -10,26 +10,6 @@
 
 \ ORG = &21B8      \ P% = &21B8
 
-\\      &2FC0 is in the table/sprite space above .ba         
-\\picn=&2FC0       \\bug ? typo         \\ picn=&1D54 different value in PIGSRCE !!
-
- \ !Xg=&2F30CF20:!plf=&2F40:!bof=&2F38:!de=&420320
- \ ?bfg=2:!bulst=&2D472D0A:?&2D0A=8:?&2D47=20
- \ !pls=&2D13:?&2D13=25
-
-\ Program locations
-\ mostly are in the G, PIGSRCE memory space
-\ C%=&261A
-\ scr=&284A
-\w=&285A
-\X%=&258D
-\R%=&25B8
-\V%=&25C9
-\lg=&26B0
-
-\ OLDSRCE uses: !pls=&2D13:?&2D13=25
-\ pls_addr = &2D13, now plane_list
-
 \ AF 6/6/2021 moved to top to align to Iains
 \TODO minor differences here in .mini
 \ from here appears in G at 2223
@@ -51,7 +31,7 @@
 .gun_hit_display
 .h0      
    LDA #&20:BIT sc:BNE h1                    \ if bit is set then hit, e
-   LDA gex:BNE h12
+   LDA gex:BNE h12                           \ gex counts down from &FF to zero
 .hreturn
    RTS      \2244   60         RTS
 .h1 

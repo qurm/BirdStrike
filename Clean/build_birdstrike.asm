@@ -54,7 +54,7 @@ osbyte  = $FFF4        \ OSBYTE
 \ Zero Page locations
 no=&70:       \ number used in bombs too - generic counter
 \ Flags are used bit-wise
-bfg = &71     \ bird flag , set to 2 intially
+bfg = &71     \ bullet flag , set to 2 intially
 pfg = &72     \ plane flag ?
 pflg=&72       \ used in OLDSRCE
 bofg = &73    \ bomb flag  (from OLDSRCE)
@@ -84,34 +84,33 @@ cnt=&8E         \ counter for?
 X_base_addr = &2100 
 PRINT "X_base_addr = ", ~X_base_addr
 
+explosion_sprite_addr  = X_base_addr + &040          \ base for 3 animated sprites &30 long
+mini_gun_sprite_addr= X_base_addr + &010               \ temp player gun sprite &1928 or &1910
+
+bullet_sprite_addr  = X_base_addr + &100             \bullet simple sprite
+other_sprite_addr  = X_base_addr + &110             \todo this is gun?
+pigl_sprite_addr = X_base_addr + &100            \ Bird Sprites, Flying Left?  L=>R, on single page 
+pigr_sprite_addr = X_base_addr + &200    \ &1B00 \ Bird Sprites, Flying Right?  R=>L, on single page
+
 tm=X_base_addr + &108      \ tm+1 used for number of active 'bomb slots'
               \ memory overwrites begin at ?(tm+1)>19 (ish).
               \ tm+2 used for vsync timing counter
 \ gunf=&2F00          \ used in .gun, value is modified by .sgun
 gunf=X_base_addr + &160
 
-gex=X_base_addr + &455           \ gun explosion timer, used in gun_hit_display to show correct sprite
-                    \ gex+1 is current no of lives
-                    \ gex +2,3  is LO,HI screen address for mini gun indicator
-player_live_init = 3
-\ TODO picn different in PIG and SS, using SS as more recent
-picn=X_base_addr + &454:   \ different value in PIGSRCE !!
-not=X_base_addr + &459:    \ note sprite origin ?
-fc=X_base_addr + &45C
-PRINT ".picn = ", ~picn
-plane_table = X_base_addr + &440      \ in X.bin file
-plane_kill_count = X_base_addr + &45B
 score_sprite_base= X_base_addr + &300
-bullet_sprite_addr  = X_base_addr + &100             \bullet simple sprite
-other_sprite_addr  = X_base_addr + &110             \todo this is gun?
-explosion_sprite_addr  = X_base_addr + &040          \ base for 3 animated sprites &30 long
-mini_gun_sprite_addr= X_base_addr + &010               \ temp player gun sprite &1928 or &1910
-pigl_sprite_addr = X_base_addr + &100            \ Bird Sprites, Flying Left?  L=>R, on single page 
-pigr_sprite_addr = X_base_addr + &200    \ &1B00 \ Bird Sprites, Flying Right?  R=>L, on single page
+plane_table = X_base_addr + &440      \ in X.bin file
 
-\ $.G is loaded at &21EE (Stave-drawing onwards) (built with PIGSRCE?) 
-\ $.G       0021EE 0021EE 000E12
-\ &21EE + &0E12 = $3000   (start of MODE 2 screen video RAM)
+picn=X_base_addr + &454        \ different value in PIGSRCE !!
+gex=X_base_addr + &455           \ gun explosion timer, used in gun_hit_display to show correct sprite
+                        \ gex+1 is current no of lives
+                        \ gex +2,3  is LO,HI screen address for mini gun indicator
+player_live_init = 3
+
+not = X_base_addr + &459    \ note sprite origin , not+1
+plane_kill_count = X_base_addr + &45B
+fc = X_base_addr + &45C
+PRINT ".picn = ", ~picn
 
 
 ORG &1100
@@ -119,22 +118,13 @@ ORG &1100
 \ 1400 to 15BE
 INCLUDE "SS-01.asm"
 \ with HSTRS data to &1776 
-
-\ ORG &15C0
-\ INCBIN "HSTRS.bin"        \ MODE 7 High score and Keys, Space to start.
-                            \ derived from $.HSTRS source binary
-\ now included in SS-01
-
-\ORG &1778
-\ 1778 to 18FE
-\INCLUDE "SS-02.asm"
-\ combined with SS-01
+\ MODE 7 High score and Keys, Space to start.
+\ derived from $.HSTRS source binary
 
 \ ORG &1E00
 \ &15FD to &19DD 
 INCLUDE "SS-03.asm"
 \ has entry point .game
-\ when combined with below files goes to 22EF
 
 \ ORG &2223
 INCLUDE "PIG-01.asm"
@@ -193,6 +183,7 @@ INCLUDE "GG-02.asm"
 
 
 ORG &2E00
+plane_sprite_addr  = &2F00              \ base for 4 levels of plane
 INCBIN "G-Plane.bin"        \ sprite and data file &2E00 to &3000, &200 bytes
                             \ cloud, plane sprites
                             \ derived from $.G source binary

@@ -61,8 +61,8 @@
 \\ Inputs
 \\ Outputs
 .game_over
-{
 .gov 
+{
   PLA:PLA                        \ pull stack, will not return to calling routine
   LDY#255
 .gov1                            \ Spell out GAME OVER slowly, delay between characters
@@ -84,14 +84,14 @@
 
 \\ Move plane patch or additional logic
 \\ Called from Move plane  see PIG-01
-\\ TODO Move this into calling routine  - is it used?
-.stp4 
-  RTS
-.stp6 
-  LDA gex:BEQ stp4
-  LDA psta:EOR #&80:STA psta:INC exp \ bug! old source check for bounds?
-  PLA:PLA                         \ pull return address from stack
-  JMP fo+3
+\\ DONE Moved this into calling routine in GG-02
+  \.stp4 
+  \  RTS
+  \.stp6 
+  \  LDA gex:BEQ stp4
+  \  LDA psta:EOR #&80:STA psta:INC exp \ bug! old source check for bounds?
+  \  PLA:PLA                         \ pull return address from stack
+  \  JMP fo+3
 \\ End of 
 
 
@@ -99,7 +99,8 @@
 \\ Bonus routine
 \\ Bonus completed, reward by playing the tune  
 \\ Called from 
-.bon 
+.bon
+{
   LDA fc:AND #3:BNE bon0    \ load frame/level counter, if 0,4,8,.. 
   LDA #15:JSR delay         \ then pause, delay for 15x20 = 300ms
   JSR stmv:JMP bon11        \ do stmv , draw tune, then play tune.
@@ -123,9 +124,12 @@
   DEC bsou
   LDA #&80:ORA sc:STA sc                    \ set score flag
   RTS
+}
 
-\Write Bonus message
+\\ Write Bonus message
+
 .wbmsg 
+{  
   LDY #0:
 .wb1 
   LDA bmsg,Y:JSR &FFEE:       \ iterate through 0 to 10 char
@@ -133,13 +137,16 @@
 .bmsg 
   EQUD &071F0611: EQUB &F      \ Mode 7, Cyan text, centred
   EQUS "BONUS!"               \ message
+}
+
+\ Moved to end GG02, with other Sounds
 \ Bonus Sound definition for OSWORD 7, SOUND call
 \ parameter block, 8 bytes
 \ SOUND &0012, &FFFF, 0, 0
-.bsou 
-  EQUD &FFFF0012 
-  EQUD 0
-  EQUB &FF        \padding added AF 7/6/21 to align to published
+\.bsou 
+\  EQUD &FFFF0012 
+\  EQUD 0
+\  EQUB &FF        \padding added AF 7/6/21 to align to published
 
 
 \\ Start of HSTRS file, MODE 7 bytes
@@ -252,7 +259,10 @@ EQUB &70, &6C, &61, &79, &2E, &00
   LDA tm:STA fc:
   LDA #26:JMP oswrch     \JMP to OSWRCH, so will RTS to calling code
 .stm10      \static bytes 4+4+2+1 = 11 bytes
-  EQUD &04FF0310:EQUD &000F020F:EQUW &18F0:EQUB 26
+  EQUD &04FF0310:
+  EQUD &000F020F:
+  EQUW &18F0:
+  EQUB 26
 \\ End Draw Musical Staves, Notes, Play Tune
 
 
