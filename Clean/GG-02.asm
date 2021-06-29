@@ -104,14 +104,15 @@
     LDA gunp:ADC #8:STA gunp            \ screen memory pos +8
     BCC gd
         INC gunp+1
-.gd 
-    SEC:LDA #0:STA pos:LDY #&24        \ clear pos, Y=base address index
+.gd                                    \ check collision - any non zero pixels on bottom line.
+    SEC:LDA #0:STA pos:LDY #&24        \ clear pos, Y=address index, &24,1C,14,0C,04
 .ch 
-    LDA(gunp),Y:BEQ cop:STA pos        \ store in pos
+    LDA(gunp),Y:BEQ cop:STA pos        \ if blank, skip, else store in pos.
 .cop 
-    TYA:SBC #8:TAY:BPL ch               \ Y=Y-8 repeat while Y> 0 
-    LDA pos:BEQ plot_gun_sprite         \ if pos=0 skip ahead
-    LDA sc:ORA #&20:STA sc              \ sc = score flag - set bit &20, not used by score?
+    TYA:SBC #8:TAY:BPL ch               \ Y=Y-8 loop while Y> 0 
+    LDA pos:BEQ plot_gun_sprite         \ if pos=0 skip draw gun, else hit?
+    LDA sc:ORA #&20:STA sc              \ sc = score flag - set bit &20, gun was hit.
+                                        \ this is detected in gun_hit_display
 }
 
 \\ Gun, plot gun sprite XOR, from gunf,Y to (gunp),Y
@@ -538,6 +539,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 
 
 \\ New bombs
+\\ TODO - bofg is restricting to 2 bombs?
 .nbo 
     NOP                             \  Gets changed to RTS by gun_hit_display
     LDA #&C0
@@ -611,15 +613,29 @@ ORG &2CF0           \ some space
     EQUB &00,&00,&00,&00
     EQUB &00,&00,&00,&00
 
+  \\ plane_list like this, 5 bytes per plane
+  \ 81, LO, HI, ?, ?
+  \ exp, pos, pos+1, psta, yo
+  \ 42 9A 39 43 CA    \this is flying near top
+  \ 41 39 5F 47 41    \this is flying mid right
+  \ 81 A8 3A 95 D0
+  \ 81 F8 3A 9F D0
+  \ 81 48 3B A9 D0
+  \ 81 98 3B B3 D0
+  \ 81 E8 3B BD D0
 .plane_list                 \ was pls_addr=&2D13 
-    EQUB &1E 
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
-    EQUB &00,&00,&00                    \ padding
+    EQUB &1E      \ TEST AF was &1E = 6 planes, &F = 3 planes
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00,&00,&00,&00,&00
+    EQUB &00                    \ padding
 \ IFM - L2D47 - sprite pointers? Maybe more?
 
 \ORG &2D47
@@ -659,7 +675,8 @@ ORG &2CF0           \ some space
 
 \ ORG &2D80
 ORG &2D78
-\ OSWORD Envelope definitions, 14 bytes, with 2 unused padding, so 16
+\\ OSWORD Envelope definitions, 14 bytes, with 2 unused padding, so 16
+\\ padding gaps are filled with other variables.
 .envelope_base_addr                         \ IFM - envelope data
     EQUB    $01,$81,$FD,$00,$00,$28,$00     \ Pigeon 'tweet'
     EQUB    $00,$3C,$06,$CE,$CE,$3B,$7E
@@ -680,7 +697,7 @@ ORG &2D78
 .Xg
     EQUB    $20             \ Player gun X coordinate
 .inb
-    EQUB    $D7             \ default value for bofg, used in nbo, initial #&F0, DEC
+    EQUB    $DF             \ bomb interval default &F value for bofg, used in nbo
 
     EQUB    $04,$81,$FB,$E6,$FE,$10,$01     \ Player fire
     EQUB    $5A,$7F,$FE,$E2,$9C,$7E,$00

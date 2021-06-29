@@ -14,47 +14,6 @@
   \ AF: Last few chars of this string may have been used for padding to adjust some location
   EQUS "Thanks David,Ian,Martin,Mum,Dad,Susi C"
 
-\\ Check Plane right bounds, do movement?
-\\ Called from GG-02 Plane function - as a patch?
-\\ TODO relocate this to the Plane routine in GG-02
-\\ Calls JSR fo (plane plotting)
-\        .nlr                \ Move enemy / check left bound
-\        {
-\          LDA tog:BEQ enlr:LDA exp:BPL rt
-\          DEC psta:SEC:LDA pos:SBC#8:STA pos:BCS enlr
-\          DEC pos+1:JMP enlr
-\        .rt                 \ Check right bound
-\          INC psta:CLC
-\          LDA pos:ADC #8:STA pos
-\          BCC enlr
-\            INC pos+1
-\        .enlr 
-\          LDA #01:EOR tog:STA tog
-\          JMP fo                          \ plane plotting
-\        .tog 
-\          EQUB 0                       \ toggle byte, 0/1
-\        }
-
-
-\\ fpat - Fire patch - bullet counter?
-\\ Called from New bullet, nb, player fires, added afterwards?
-\\ TODO relocate this to the New bullet GG-02; create new counter addr for fp0
-\\ Calls 
-\\ Inputs
-\\ Outputs
-\\ Sets values for fp0 counter
-\    .fpat
-\    {
-\      LDA fp0:BEQ fp1             \ decrement counter, return if > 0
-\      DEC fp0:RTS
-\    .fp1 
-\      LDA #18:STA fp0             \ reset counter to 18
-\      JMP nwb_patch_return        \ &297D
-\    }
-\    .fp0 
-\      EQUB 0                      \ modified above
-\\ End of fpat - Fire patch 
-
 \\ game_over - Display GAME OVER message, and 
 \\ Called from gun_hit_display, after last player killed.
 \\ Calls newgame
@@ -82,26 +41,12 @@
 \\ End of game_over - Display GAME OVER message
 
 
-\\ Move plane patch or additional logic
-\\ Called from Move plane  see PIG-01
-\\ DONE Moved this into calling routine in GG-02
-  \.stp4 
-  \  RTS
-  \.stp6 
-  \  LDA gex:BEQ stp4
-  \  LDA psta:EOR #&80:STA psta:INC exp \ bug! old source check for bounds?
-  \  PLA:PLA                         \ pull return address from stack
-  \  JMP fo+3
-\\ End of 
-
-
-
 \\ Bonus routine
 \\ Bonus completed, reward by playing the tune  
 \\ Called from 
 .bon
 {
-  LDA fc:AND #3:BNE bon0    \ load frame/level counter, if 0,4,8,.. 
+  LDA fc:AND #3:BNE bon0    \ load frame/level counter, if 4,8,12.. 
   LDA #15:JSR delay         \ then pause, delay for 15x20 = 300ms
   JSR stmv:JMP bon11        \ do stmv , draw tune, then play tune.
 .bon0                       \ Choose tune, based on frame counter, play tune
@@ -115,12 +60,12 @@
   LDA #2:JSR delay                          \ then delay for 2x20 = 40ms
   TYA:PHA
   LDX #LO(sound_bonus):LDY#HI(sound_bonus) 
-  LDA#7:JSR osword                          \ OSWORD - A=7 SOUND command at &2DF8
+  LDA #7:JSR osword                          \ OSWORD - A=7 SOUND command at &2DF8
   JSR score_update_screen                   \ display score
   PLA:TAY:DEY:BNE bon1
-  INC bsou
-  LDX #LO(bsou):LDY#HI(bsou)              \sound defined below
-  LDA#7:JSR osword                       \OSWORD - A=7 SOUND command at bsou
+  INC bsou                                \ why? byte 1 from &FF to 00
+  LDX #LO(bsou):LDY #HI(bsou)              \sound defined below
+  LDA #7:JSR osword                       \OSWORD - A=7 SOUND command at bsou
   DEC bsou
   LDA #&80:ORA sc:STA sc                    \ set score flag
   RTS
@@ -138,16 +83,6 @@
   EQUD &071F0611: EQUB &F      \ Mode 7, Cyan text, centred
   EQUS "BONUS!"               \ message
 }
-
-\ Moved to end GG02, with other Sounds
-\ Bonus Sound definition for OSWORD 7, SOUND call
-\ parameter block, 8 bytes
-\ SOUND &0012, &FFFF, 0, 0
-\.bsou 
-\  EQUD &FFFF0012 
-\  EQUD 0
-\  EQUB &FF        \padding added AF 7/6/21 to align to published
-
 
 \\ Start of HSTRS file, MODE 7 bytes
 \\
@@ -216,10 +151,12 @@ EQUB &70, &6C, &61, &79, &2E, &00
 \\ stm = ??
 \\ Constants:
 \stave_base_addr = &80..
+\TODO - appears to modify fc temporarily, maybe fc used in subroutines.
+stave_base_addr = &2688   \Adds 0A, so &3088, 3A88,...
 .stmv 
-  LDY #10                  \ set offset 10
+  LDY #10                       \ set offset 10
 .stm4 
-  LDA stm10,Y: JSR oswrch   \ OSWRCH Write character stm10,Y
+  LDA stm10,Y: JSR oswrch       \ OSWRCH Write character stm10,Y
   DEY:BPL stm4                  \ branch if positive, loop
   \self modifying code
   LDA #&80:STA stm2+1:
@@ -241,23 +178,23 @@ EQUB &70, &6C, &61, &79, &2E, &00
   DEC no:BNE stm1               \ loop 4,3,2,1
   
   \ draw notes, play tune
-.stm5 LDA fc:STA tm
-  LDA #0:STA fc:
-  LDA #&26:STA tm+4
-  LDA #&88:STA tm+3
+.stm5 LDA fc:STA tm             \ save fc in temp
+  LDA #0:STA fc:                \ initial fc=0, INC below to 1
+  LDA #LO(stave_base_addr):STA tm+3
+  LDA #HI(stave_base_addr):STA tm+4
 .stm6 
   CLC:
-  LDA tm+3:STA not:
-  LDA tm+4:ADC #&A:STA tm+4:
-  STA not+1:
-  JSR cht:
+  LDA tm+3:STA not              \not = X_base_addr + &459    \ note sprite origin , not+1
+  LDA tm+4:ADC #&A:STA tm+4
+  STA not+1
+  JSR cht
   STX nl:INC fc
 .stm8 
   JSR nxno:BNE stm8:JSR cht:JSR tune
   LDA #60:JSR delay               \ delay for 60x20 = 1200ms
-  LDA fc:CMP #4:BNE stm6:
-  LDA tm:STA fc:
-  LDA #26:JMP oswrch     \JMP to OSWRCH, so will RTS to calling code
+  LDA fc:CMP #4:BNE stm6          \ loop for 4 levels
+  LDA tm:STA fc:                  \ restore fc
+  LDA #26:JMP oswrch              \JMP to OSWRCH, so will RTS to calling code
 .stm10      \static bytes 4+4+2+1 = 11 bytes
   EQUD &04FF0310:
   EQUD &000F020F:

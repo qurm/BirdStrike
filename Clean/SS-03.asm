@@ -7,6 +7,8 @@
 \   Main loop & startup routines
 \   Score handling and display
 \   Musical routines and tune display
+\\ AF 29/6/21 New level intialisation uses lookup table avoids Iains unbounded
+\\   bug on high levels.  Allows more flexible difficulty model.
 
 
 \ org     $1E00          \ "P%" as per the original source
@@ -47,9 +49,29 @@
 
   EQUS "(c)A.E.Frigaard 1984 Hello!"
 
+\\ Define lists for any parameters changing over 8 levels
+\\ USed in ..  uses Level 8 for all subsequent
+.level_de
+EQUB 30, 30, 28, 28, 26, 26, 24, 24    \ -2 on odd levels
+
+.level_bullet_count   \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
+EQUB 8, 8, 12, 16, 16, 16, 16, 16
+.level_bullet_interval 
+EQUB 6, 8, 12, 12, 12, 12, 12, 12
+.level_bomb_count 
+\EQUB 2, 2, 4, 4, 2, 2, 4, 4  
+EQUB 3, 4, 5, 4, 4, 4, 4, 4  
+.level_inb
+.level_bomb_interval
+\EQUB &EF,&EF,&EE,&EE,&ED,&ED,&EC,&EC
+EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
+\timer=C => room for 3 on screen
+
+\\ try one plane per level to speed up testing.
+
 \\ Start new game, was .S%
 \\ Intialise variables, setup screem
-\\ Called for every new game
+\\ Called for every new game (not each level)
 .start_game                           
   LDA #5:STA no:JSR def_envelopes     \ Store 5 at counter, call define envelope E%
   LDA #&49:JSR tune                   \ play starting tune
@@ -57,9 +79,9 @@
   LDA #2:JSR oswrch     
   \ intialise to zero counters, scores
   LDA #0:STA exg3:STA cnt:STA fc:STA picn:STA gex:STA sc+1:STA sc+2:STA plf:CLC
-  LDA #32:STA de
-  LDA #3:STA ti       \ ti=de+1 initial timer value
-  LDA #42:STA ti+1    \ default timer value  was de+2:
+  \LDA #32:STA de
+  LDA #3:STA ti       \ ti=de+1 initial timer value first plane to fly
+  LDA #42:STA ti+1    \ default timer value  was de+2, subsequent timer 
   LDA #2:STA bfg
 
   LDA #LO(bullet_list):STA bulst
@@ -80,8 +102,11 @@
   LDA #player_live_init:STA gex+1        \\ player lives, 3
   \ LDA #&2F:STA plf+1
   LDA #HI(plane_sprite_addr):STA plf+1    \ LO addresses set per game frame
-  LDA #&F0:STA inb        \\ flag 1111 0000
-  LDA #0:STA tm+1         \\ used for bomb list counter start (0),2,3 AF try 2
+
+  \\ new level intialisation AF 29/6/21
+  \\ not reqd
+  \LDA #&F0:STA inb        \\ flag 1111 0000
+  \LDA #0:STA tm+1         \\ used for bomb list counter start (0),2,3 AF try 2
 
 \\    init, L1, L2, L3, ..
 \\ de   32, 30, 30, 28    \ -2 on odd levels
@@ -97,39 +122,55 @@
 \\ gex+1 03         \player lives, no change
 
 
-\\ try one plane per level to speed up testing.
-
 \\ Begin Level (next frame)
 \\ TO DO - Iains fix here
 \ de=&2D79  initialised with !de=&400314 (3 bytes, ti=&40)
 .bf 
   JSR cht                   \ call Change Tune, returns A=? X=?
-  STX nl:INC fc:            \ increment frame counter, game level
-  LDA de:CMP #15:BMI b0:    \ if de, difficulty < 15, go .b0  (branch if minus)
-  LDA fc:AND #1:BEQ b0      \ else if level is odd (1,3,5)
-  DEC de:DEC de:            \ then decrement x 2 de
-  DEC inb                   \ and decrement inb
+  STX nl:INC fc:            \ increment frame counter, game level  X=7??
+  \LDA de:CMP #15:BMI b0:    \ if de, difficulty < 15, go .b0  (branch if minus)
+  \LDA fc:AND #1:BEQ b0      \ else if level is odd (1,3,5)
+  \DEC de:DEC de:            \ then decrement x 2 de
+  \DEC inb                   \ and decrement inb
 \.b0                        \ IainFM: I also moved the .b0 label in SS-03.asm. That seems to have cured the bug, although I've not tested it to destruction yet!
-
-  INC tm+1:INC tm+1:        \ inc x 2 tm+1, this is default timer?  Add 2 more bomb per level?
+  \INC tm+1:INC tm+1:        \ inc x 2 tm+1, this is default timer?  Add 2 more bomb per level?
   \TODO check bounds, also only two bombs shown on level 1 even with 4
-.b0
-  LDA #12:JSR oswrch        \ OSWRCH clear the screen
-  LDA #154:LDX #20:JSR osbyte    \ OSBYTE Write to video ULA control register and OS copy 
-  JSR plot_clouds                 \ Draw the clouds, was C%
-  JSR draw_backgnd_art            \ Draw the vector art, V%
-  JSR stv:                        \ Draw the musical stave, stv?
-  JSR score_update_screen         \ Write the score to screen
 
-  LDA #0:STA plane_kill_count:
-  STA sc:STA ba+1
-  \  &54 bytes covers bullet_list, plane_list, bomb_list - can extend this:
+  \ initialise lists by clearing to zero
+  \ &54 bytes covers bullet_list, plane_list, bomb_list - can extend this:
   LDY #cloud_sprite_offset_list - bullet_list -1
 .b1 
   STA bullet_list,Y: DEY: BNE b1      \ clear &54 bytes at &2D0A (bullet_list set to 0)
-  LDA tm+1:STA bomb_list              \ allow up to 2? bombs
-  LDA #12:STA bullet_list              \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
-  LDA #30:STA plane_list              \ allow up to 7 x 4 byte planes
+
+
+.b0
+  LDA #12:JSR oswrch              \ OSWRCH clear the screen
+  LDA #154:LDX #20:JSR osbyte     \ OSBYTE Write to video ULA control register and OS copy 
+  JSR plot_clouds                 \ Draw the clouds, was C%
+  JSR draw_backgnd_art            \ Draw the vector art, V%
+  JSR stv                         \ Draw the musical stave, stv?
+  JSR score_update_screen         \ Write the score to screen
+
+  
+  LDA #0:STA plane_kill_count:
+  STA sc:STA ba+1
+
+  \\ new level intialisation AF 29/6/21
+  LDY fc: DEY               \ zero based , first level=0
+  LDA level_de,Y: STA de
+  LDA level_bomb_interval,Y
+  STA inb
+  LDA level_bomb_count,Y
+  \STA tm+1:  \LDA tm+1:
+  STA bomb_list              \ allow up to 4 bombs
+  LDA level_bullet_count,Y
+  STA bullet_list             \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
+  LDA #30:                    \ TEST set to 10, 2 planes
+  STA plane_list              \ allow up to 6 x 5 byte planes AF TEST was 30
+
+  \LDA tm+1:STA bomb_list              \ allow up to 2? bombs
+  \LDA #12:STA bullet_list             \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
+  \LDA #10:STA plane_list              \ allow up to 7 x 4 byte planes AF TEST was 30
   note_screen_addr = &3088
   gun_screen_addr = &3280             \ or 3288?
   LDA #LO(note_screen_addr):STA not
@@ -146,22 +187,12 @@
   DEX:BNE pmi                 \ loop for no of guns
 
   \\ draw initial planes
-  \\ plane_list like this, 4 bytes per plane
-  \ 81, LO, HI, ?, ?
-  \ exp, pos, pos+1, psta, yo
-  \ 42 9A 39 43 CA    \this is flying near top
-  \ 41 39 5F 47 41    \this is flying mid right
-  \ 81 A8 3A 95 D0
-  \ 81 F8 3A 9F D0
-  \ 81 48 3B A9 D0
-  \ 81 98 3B B3 D0
-  \ 81 E8 3B BD D0
-    plane_screen_addr = &3A81     \ TODO - this is not an address
+  plane_screen_addr = &3A81     \ TODO - this is not an address
   LDA #HI(plane_screen_addr):STA sd+1   \ sd not used in intialisation
   LDA #LO(plane_screen_addr):STA sf     \ odd, uses sf as a temp workspace
   LDX#1:LDY#8
 .pp1                            \TODO use of sf seems incomplete?  inspect list?
-  LDA #LO(plane_screen_addr)      \ #&81
+  LDA #LO(plane_screen_addr)    \ #&81
   STA plane_list,X              \ LO address element 1
   INX:TYA                       \ Y = 8, copy to A
   CLC
@@ -171,10 +202,12 @@
   STA plane_list,X: STA sd+1    \  HI address=element 3
   CLC:INX
   LDA sf:ADC #10      
-  STA sf:STA plane_list,X       \  81, 95, 9F, A9, B3, BD = element 4
+  STA sf:STA plane_list,X       \  81, 95, 9F, A9, B3, BD = element 4 psta?
   INX
-  LDA #&D0:STA plane_list,X     \ D0 - sort of flag, sprite offset?
+  LDA #&D0:STA plane_list,X     \ y-coord? &D0 - sort of flag, sprite offset?
+  \TODO use BCC compare with 30, use bullet_list 
   INX:CPX #31:BMI pp1           \ loop 6 times, X inc 5 each cycle
+  \INX:CPX #16:BMI pp1           \ loop 6 times, X inc 5 each cycle  AF TEST
 
   LDY #0
   LDA (pls),Y:STA no            \ plane_list, 0 is &1E,30 = 6 planes, 5 bytes
@@ -205,11 +238,13 @@
 \ sc = &01 : Unused?  Set in nb, when firing bullet
 \ sc = &02 : Plane killed / +15(0) points 
 \ sc = &10 : Pigeon killed (note added to stave / +10(0) points)
-\ sc = &20 : Unused?  Set in mg, move_gun
+\ sc = &20 : Set in mg, move_gun when hit, detected in gun_hit_display before .sor
 \ sc = &40 : Plane Wing has been hit (pigeon release / +1(0) points)
 \ sc = &80 : Level is complete (load next level / +0 points)
-\ sc+1
-\ sc+2 
+\ Output:
+\ sc is cleared = 0
+\ sc+1  increased
+\ sc+2  increased
 .sor 
   LDA sc:BEQ score_update_screen  \ if zero, no score events
   SED                       \ decimal scoring

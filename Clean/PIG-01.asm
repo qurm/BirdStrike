@@ -30,11 +30,11 @@
 \\ Called from main loop, after all moves, before score.
 .gun_hit_display
 .h0      
-   LDA #&20:BIT sc:BNE h1                    \ if bit is set then hit, e
-   LDA gex:BNE h12                           \ gex counts down from &FF to zero
+   LDA #&20:BIT sc:BNE h1                    \ if bit is set then gun just hit in move_gun
+   LDA gex:BNE h12                           \ else gex counts down from &FF to zero
 .hreturn
-   RTS      \2244   60         RTS
-.h1 
+   RTS
+.h1   \ player is hit
    LDX #0:LDY#7:JSR def_log_colour           \ define background as white? temp flash.
    LDA #7:LDY #HI(sound_player_hit):LDX #LO(sound_player_hit):JSR osword       \ Sound  sound_player_hit
    LDA #&FF:STA gex                          \ counter for explosion
@@ -46,7 +46,7 @@
    JMP plot_gun_sprite                       \ re-draw sprite was .gun, exit.
 .h12 
    DEC gex:LDA gex:CMP #254:BNE h3           \ gex, gun explosion, during which does not move etc
-   LDX #0:LDY #0:JMP def_log_colour          \ define background as white? temp flash.
+   LDX #0:LDY #0:JMP def_log_colour          \ re-define normal background (was temp flash).
 .h3 
    CMP #&DC:BNE h4:JSR plot_gun_sprite       \ show next different sprite offset, animation.
    LDA #&38:STA gun+3:JMP plot_gun_sprite

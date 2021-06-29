@@ -92,7 +92,8 @@ other_sprite_addr  = X_base_addr + &110             \todo this is gun?
 pigl_sprite_addr = X_base_addr + &100            \ Bird Sprites, Flying Left?  L=>R, on single page 
 pigr_sprite_addr = X_base_addr + &200    \ &1B00 \ Bird Sprites, Flying Right?  R=>L, on single page
 
-tm=X_base_addr + &108      \ tm+1 used for number of active 'bomb slots'
+tm=X_base_addr + &108     \ tm used in stmv as temp store of fc 
+                \ tm+1 used for number of active 'bomb slots'
               \ memory overwrites begin at ?(tm+1)>19 (ish).
               \ tm+2 used for vsync timing counter
 \ gunf=&2F00          \ used in .gun, value is modified by .sgun
