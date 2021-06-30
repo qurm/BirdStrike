@@ -82,6 +82,7 @@
 
 \\ Move players gun
 \\ Called from main loop
+\\ No check for collision with bomb
 \\ Updates: Xg (x-coord), gunp (screen memory pos)
 .mg
 .move_gun
@@ -206,7 +207,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     LDA #1
     BIT bfg                             \ test can fire again?  Not used, replaced by fp0 counter?
     BNE nwb0
-    LDA #&81:LDY#&FF:LDX#&B6           \ TODO changed LDX#&A6 to LDX#&B6 to fix player firing  
+    LDA #&81:LDY#&FF:LDX#&B6           \ LDX#&B6 to fix player firing  
     JSR osbyte                         \ OSBYTE 129 Read key, keyboard scan for ENTER -74
     INX:BEQ nwb1                        \ if pressed, fire
 
@@ -278,6 +279,12 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     RTS
 }
 
+
+\\fast XOR plotting 
+\\ EOR(st),Y:STA(st),Y
+\\ LDA(st),Y:EOR#&2A:STA(st),Y, or
+\\ TXA : EOR(st),Y:STA(st),Y
+\\ dedicate ZP for 
 
 \\ New plane, np, STarts a plane flying from the formation
 \\ Determines if level is complete if no planes remaining.
@@ -399,7 +406,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     PLA:TAY
     \\ end plane hit bullet detection 
 
-    LDA bofg:AND #&BF:STA bofg
+    LDA bofg:AND #&BF:STA bofg          \ clear bit 6 on bofg - why?
     INC pflg:JSR pp                     \ un-plot the plane
     LDA yo:CMP #&AF:BNE hop5            \ check Y-coord is not bottom => hop5
         SEC:LDA pos:SBC #&87:STA pos    \ is bottom, move to top -&4887
@@ -538,56 +545,68 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ end pp, Plane plot sprite
 
 
+\\ Use of bofg      zp at &73
+\\ Set in nbo from inb, as &F0,&EF,&EF,&EE,&EE by level
+\\ move plane: clears bit 6 on bofg - why?
+\\ move bomb: clears bit 7 on bofg when bomb is destroyed
+\\ nbo DEC and checks bofg timer to release a new bomb
+\\ bofg low bits are timer &F, reducing by level
+\\ bofg high bits are timer &F, reducing by level
+
 \\ New bombs
 \\ TODO - bofg is restricting to 2 bombs?
 .nbo 
     NOP                             \  Gets changed to RTS by gun_hit_display
     LDA #&C0
-    BIT bofg:BNE nbo4
-    DEC bofg:BNE nbo4
+    BIT bofg:BNE nbo4               \ BIT %1100 0000, if bit 6 or 7 set, then skip
+    DEC bofg:BNE nbo4               \ bofg is timer/counter, if zero, then new bomb
     LDY #255
 .nbo2 
-    INY:INY:INY:INY:INY:LDA(pls),Y:BMI nbo2
-    DEY:DEY:DEY:LDA(pls),Y:AND #&C0:BNE nbo5
-    INY:INY:INY:JMP nbo2
+    INY:INY:INY:INY:INY:LDA(pls),Y:BMI nbo2     \ find the active plane, unbounded loop
+    DEY:DEY:DEY:LDA(pls),Y:AND #&C0:BNE nbo5    \ is plane doing? then
+    INY:INY:INY:JMP nbo2                        \ else try next plane..
 .nbo5 
-    INY:CLC:LDA(pls),Y:ADC #&9D:STA sd:
+    INY:CLC:LDA(pls),Y:ADC #&9D:STA sd          \calculate bomb addr from plane addr + &029D
     INY:LDA(pls),Y:ADC#2:STA sd+1:
-    JSR plot_bullet_sprite                    \ XOR remove plot_bullet_sprite
+    JSR plot_bullet_sprite                    \ first draw plot_bullet_sprite
     LDY #0
 .nbo3 
     INY:INY:LDA(bost),Y:BNE nbo3            \ find a free bomb slot
+                                            \ TODO add bounds to loop based on bost
     LDA sd+1:STA(bost),Y:DEY:LDA sd:STA(bost),Y
-    LDA inb:STA bofg                        \ store inb in bofg
+    LDA inb:STA bofg                        \ store inb in bofg, inb &F0,&EF,&EF,&EE,&EE,
 .nbo4 
-    LDA #&C0:ORA bofg:STA bofg:RTS
+    LDA #&C0:ORA bofg:STA bofg:RTS          \ OR with %1100 0000, sets bit 6 and 7.
+                                            \ => no change until inb decremented many times, > 32 levels?
   
-\ Move bombs
-\ bost - bomb slot table  
+\\ Move bombs
+\\ bost - bomb slot table  
+\\ bomb moves 2 pixels per cycle  sd AND #7 is 0,2,4,6
+\\ uses memory addresses, no X,Y.
 .mbo 
     LDY #0:LDA(bost),Y:STA no               \ load no bombs, zero page
     LDA bof:STA sf:LDA bof+1:STA sf+1       \ load sprite locn, zero page
 .ntbo 
     INY:LDA(bost),Y:STA sd:                 \load bomb into zero page sd
     INY:LDA(bost),Y:STA sd+1
-    BNE bo1:
-    LDA #&7F:AND bofg:STA bofg:JMP bo7      \ mask bofg, clear top bit
+    BNE bo1                                 \ if zero sd+1, => bomb already destroyed
+        LDA #&7F:AND bofg:STA bofg:JMP bo7  \ so mask bofg, clear top bit
 .bo1 
     JSR plot_bullet_sprite                  \ undraw plot_bullet_sprite
-    LDA sd:AND#7:CMP#6:BPL bo2
-    INC sd:INC sd:LDA sd+1:JMP bo4          \ bottom?
-.bo2 
-    CLC:LDA sd:ADC #&7A:STA sd              \ add &027A to bomb screen address (n rows?)
+    LDA sd:AND#7:CMP#6:BPL bo2              \ if pixel = 6 %0110 then new line
+    INC sd:INC sd:LDA sd+1:JMP bo4          \ else sd=sd+2
+.bo2    \ new line
+    CLC:LDA sd:ADC #&7A:STA sd              \ add &027A to bomb screen address (1 rows)
     LDA sd+1:ADC #2:STA sd+1
 .bo4 
-    CMP #&80:BMI bo6:
-    LDA #0:STA(bost),Y:BEQ bo7 \always           \bomb hits bottom? set bost=0
+    CMP #&80:BMI bo6                        \ check bottom of screen
+    LDA #0:STA(bost),Y:BEQ bo7 \always      \ yes, bomb hits bottom; set bomb[1]=0
 .bo6 
-    JSR plot_bullet_sprite                       \ re-draw plot_bullet_sprite
+    JSR plot_bullet_sprite                  \ re-draw plot_bullet_sprite
     DEY:LDA sd:STA(bost),Y:
-    INY:LDA sd+1:STA(bost),Y                    \ put back in bomb table
+    INY:LDA sd+1:STA(bost),Y                \ put back in bomb table
 .bo7 
-    CPY no:BMI ntbo                             \ another bomb? then loop, or exit
+    CPY no:BMI ntbo                         \ another bomb? then loop, or exit \TODO use BCC/BCS
     RTS
 
 
@@ -605,7 +624,7 @@ PRINT ".end_GG_02_code = ", ~end_GG_02_code
 \ ORG &2D02
 ORG &2CF0           \ some space
 \ this is all zeroed in start_game 2D0A to 2D5E
-\ AF 27/6/2021 added 2 more entries, 8 bytes
+\ AF 27/6/2021 added 2 more entries, 8 bytes total 17
 .bullet_list                \ pointer to this in zero page bulst=&8A
     EQUB &08                \ contains max no of bullets 8
     EQUB &00,&00,&00,&00        \ exp, screen address sd, sd+1
@@ -613,7 +632,7 @@ ORG &2CF0           \ some space
     EQUB &00,&00,&00,&00
     EQUB &00,&00,&00,&00
 
-  \\ plane_list like this, 5 bytes per plane
+  \\ plane_list,1 count, 5 bytes per plane, 6 to 10, Total 51
   \ 81, LO, HI, ?, ?
   \ exp, pos, pos+1, psta, yo
   \ 42 9A 39 43 CA    \this is flying near top
@@ -642,7 +661,8 @@ ORG &2CF0           \ some space
 
 \.L2D47
 .bomb_list                \ pointer to this in zero page bost=&8C
-        EQUB    $02,$D6,$00,$00,$00,$00,$00,$00
+        EQUB    $02     \ no of bombs, default 2
+        EQUB    $D6,$00,$00,$00,$00,$00,$00
         EQUB    $00,$00,$00,$00,$00,$00,$00,$00
         EQUB    $00,$00,$00,$00,$00,$00,$00,$00
 
