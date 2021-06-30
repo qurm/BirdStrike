@@ -245,8 +245,12 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
 \ sc is cleared = 0
 \ sc+1  increased
 \ sc+2  increased
-.sor 
-  LDA sc:BEQ score_update_screen  \ if zero, no score events
+.score_exit
+  RTS
+.sor
+{ 
+  \LDA sc:BEQ score_update_screen  \ if zero, no score events
+  LDA sc:BEQ score_exit     \ if zero, no score events, so exit
   SED                       \ decimal scoring
   AND #2:BEQ s1             \ bit 1 not set
   CLC:LDA #&15              \ score for plane 15 => 150
@@ -281,7 +285,8 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
   JMP ef
 .s3 
   LDA #0:STA sc             \ clear score byte for next cycle
-  RTS 
+                            \ fall through to display score
+\  RTS 
 \ sor end
 
 \\ Writes the score to screen
@@ -301,7 +306,7 @@ score_sprite_dest=&34B0
   LDA #&F:AND sc+1:ASLA:ASLA:ASLA:ASLA:JSR plot_score
   \ xxxxN final digit, always 0
   LDA #0:JMP plot_score
-
+}
 \\ Scoring - check for extra player
 \\ Called from: Calculate the Score 
 \\ routine was moved from SS-01 to go with score routines here

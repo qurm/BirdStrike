@@ -31,3 +31,15 @@ Features:
     ☐ Other special flying feature, similar to pigeon, to drive power-up, score.
     ☐ Some form of power-up (more bullets, faster bullets) for player.
     ☐ Protective shield as power-up (in trench)
+
+
+Code Efficiency:
+    Profiling to show what instructions are run
+    https://stardot.org.uk/forums/viewtopic.php?f=4&t=21875&p=310100&hilit=code+profiler&sid=ec9fc8d99d722804f6bb6a7009c93151#p310100
+
+    ✔ Score is writing 5 sprites each cycle - only needed on change. @done(21-06-30 20:41)
+    ☐ gun position is XOR plotting each cycle - only needed on move.  Needs changes to collission detection
+    ☐ plot_plane loop high - large sprite, always moving or waste?.
+    ☐ keyboardScan loop high - always moving or waste?.
+    ☐ tune t3 loop high - seems odd waste?.
+    ☐ plot_pigeon_sprite - loop high - large sprite waste?.

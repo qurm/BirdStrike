@@ -84,11 +84,12 @@
 \\ Called from main loop
 \\ No check for collision with bomb
 \\ Updates: Xg (x-coord), gunp (screen memory pos)
+\\ TODO optimised to only call unplot if is moving
 .mg
 .move_gun
 {
     NOP                                 \ SMC set to RTS to disable
-    JSR gun                             \ address of .gun  &28D3
+    JSR plot_gun_sprite                 \ unplot 
     LDA #&81:LDY #&FF:LDX #&BD          \ http://beebwiki.mdfs.net/OSBYTE_%2681
     JSR osbyte                          \ check for "X" move right
     INX:BEQ r
@@ -96,19 +97,29 @@
     INX:BNE gd
 .l                                      \ move left 
     LDX Xg:CPX #1:BEQ gd:               \ check limit
-    DEX:STX Xg:SEC:                     \ X coord -1
+    DEX:STX Xg                          \ X coord -1
+    \JSR plot_gun_sprite                 \ unplot 
+    SEC
     LDA gunp:SBC#8:STA gunp:BCS gd      \ screen memory pos -8
         DEC gunp+1:BCC gd               \ always
 .r                                      \ move right 
     LDX Xg:CPX #71:BEQ gd:              \ check right limit
-    INX:STX Xg:CLC
+    INX:STX Xg
+    \JSR plot_gun_sprite                 \ unplot    
+    CLC
     LDA gunp:ADC #8:STA gunp            \ screen memory pos +8
     BCC gd
         INC gunp+1
+    
+    \LDY #0:LDA(gunp),Y
+    \LDY #&18:LDA(gunp),Y
+    \LDY #&20:LDA(gunp),Y
+                                        \ gun is un-plotted,so screen is clear
 .gd                                    \ check collision - any non zero pixels on bottom line.
     SEC:LDA #0:STA pos:LDY #&24        \ clear pos, Y=address index, &24,1C,14,0C,04
 .ch 
     LDA(gunp),Y:BEQ cop:STA pos        \ if blank, skip, else store in pos.
+
 .cop 
     TYA:SBC #8:TAY:BPL ch               \ Y=Y-8 loop while Y> 0 
     LDA pos:BEQ plot_gun_sprite         \ if pos=0 skip draw gun, else hit?
@@ -118,7 +129,8 @@
 
 \\ Gun, plot gun sprite XOR, from gunf,Y to (gunp),Y
 \\ MODE 2, single line for player gun 
-\\ Sprite length cycles 40 bytes
+\\ Sprite length cycles 40 bytes, gunf=X_base_addr + &160 to &188
+\\ Preserves X
 \\ Constants:
 \ \ gunf=&2358 (normal) gunf=&1A60 (explosion)
 gun_sprite_length=&27               \ &27=40 bytes
@@ -252,7 +264,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \ called from mbo, Move Bombs,  Move player bullets, shared
 \ input is zero-page sd, sf address pointers; Y index
 \ output is zero-page st, address pointers and mod?
-\ Y is preserved
+\ Y is preserved because nb uses as loop counter
 .s5 
 .plot_bullet_sprite
 {
@@ -284,7 +296,35 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ EOR(st),Y:STA(st),Y
 \\ LDA(st),Y:EOR#&2A:STA(st),Y, or
 \\ TXA : EOR(st),Y:STA(st),Y
-\\ dedicate ZP for 
+\\ dedicate ZP for table and use LDA(bulst,X)
+\\ set Yas parameter
+.plot_fast_bullet_sprite
+{
+    bullet_sprite_length=&05  
+    TYA:PHA:                        \ save Y
+    LDY #bullet_sprite_length       \ 6 bytes per bullet/bomb
+    \LDX #&2A                        \?? temp white
+    CLC:
+    LDA sd:ADC #&78:STA st:         \ add 1 row, &0278 and store in st
+    \LDA sd:ADC #&78:TAX         \ add 1 row, &0278 and store in st
+    LDA sd+1:ADC #2:STA st+1
+    LDA sd:AND#7:EOR#7:STA comp_mod+1      \ modulo, save a few cycles
+    CMP #5:BPL top                  \ if all pixels are in top line, go to top
+.bot 
+    LDA(st),Y:             \AF optimise?
+    EOR#&2A:STA(st),Y
+    DEY                 \ Y-1, loop until = mod
+.comp_mod
+    CPY#&FF:BNE bot          \ SMC -not FF, set above.    
+.top 
+    LDA(sd),Y:
+    EOR#&2A:STA(sd),Y
+    DEY:BPL top             \ Y-1, loop until 0
+    PLA:TAY:                \ restore Y
+    RTS
+}
+
+
 
 \\ New plane, np, STarts a plane flying from the formation
 \\ Determines if level is complete if no planes remaining.
