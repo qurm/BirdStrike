@@ -446,7 +446,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     PLA:TAY
     \\ end plane hit bullet detection 
 
-    LDA bofg:AND #&BF:STA bofg          \ clear bit 6 on bofg - why?
+    LDA bofg:AND #&BF:STA bofg          \ clear bit 6 on bofg - indicates plane is flying, not expl.
     INC pflg:JSR pp                     \ un-plot the plane
     LDA yo:CMP #&AF:BNE hop5            \ check Y-coord is not bottom => hop5
         SEC:LDA pos:SBC #&87:STA pos    \ is bottom, move to top -&4887
@@ -587,19 +587,22 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 
 \\ Use of bofg      zp at &73
 \\ Set in nbo from inb, as &F0,&EF,&EF,&EE,&EE by level
-\\ move plane: clears bit 6 on bofg - why?
+\\ move plane: clears bit 6 on bofg - to show plane is flying (not explosion)
 \\ move bomb: clears bit 7 on bofg when bomb is destroyed
 \\ nbo DEC and checks bofg timer to release a new bomb
 \\ bofg low bits are timer &F, reducing by level
-\\ bofg high bits are timer &F, reducing by level
-
+\\ bofg high bits are %1110, 
+\\ todo  bomb_list is max count; bomb_count is current count;
 \\ New bombs
 \\ TODO - bofg is restricting to 2 bombs?
-.nbo 
+.nbo
+{
     NOP                             \  Gets changed to RTS by gun_hit_display
     LDA #&C0
-    BIT bofg:BNE nbo4               \ BIT %1100 0000, if bit 6 or 7 set, then skip
-    DEC bofg:BNE nbo4               \ bofg is timer/counter, if zero, then new bomb
+    \LDA #&40            \AF 3/7/2021
+    BIT bofg:BNE nbo4                   \ BIT %1100 0000, if bit 6 or 7 set, then skip
+    DEC bofg:BNE nbo4                   \ bofg is timer/counter, if zero, then new bomb
+    \LDA bomb_list:STA no                 \ load no bombs, zero page AF 3/7/2021
     LDY #255
 .nbo2 
     INY:INY:INY:INY:INY:LDA(pls),Y:BMI nbo2     \ find the active plane, unbounded loop
@@ -611,14 +614,170 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     JSR plot_bullet_sprite                    \ first draw plot_bullet_sprite
     LDY #0
 .nbo3 
-    INY:INY:LDA(bost),Y:BNE nbo3            \ find a free bomb slot
-                                            \ TODO add bounds to loop based on bost
+    INY:INY:
+    \CPY no: BCS nbo4                        \ check bounds to loop based on bost
+    LDA(bost),Y:BNE nbo3                    \ find a free bomb slot
+    \JSR plot_bullet_sprite                    \ first draw plot_bullet_sprite                                  
     LDA sd+1:STA(bost),Y:DEY:LDA sd:STA(bost),Y
-    LDA inb:STA bofg                        \ store inb in bofg, inb &F0,&EF,&EF,&EE,&EE,
+    LDA inb:STA bofg                        \ store inb timer in bofg, inb &F0,&EF,&EF,&EE,&EE,
+    \INC bomb_list;                          \ inc for a new bomb
 .nbo4 
     LDA #&C0:ORA bofg:STA bofg:RTS          \ OR with %1100 0000, sets bit 6 and 7.
                                             \ => no change until inb decremented many times, > 32 levels?
-  
+}
+
+
+.new_bomb
+{
+    NOP                             \  Gets changed to RTS by gun_hit_display
+    LDA bomb_addr                   \ max count x 2, => 2,4,6
+    CMP bomb_count:BCC no_bomb      \ if actual count =< then continue   
+    LDA #&C0
+    \LDA #&40            \AF 3/7/2021  move plane: clears bit 6 on bofg - to show plane is flying (not explosion)
+    BIT bofg:BNE no_bomb                  \ BIT %1100 0000, if bit 6 or 7 set, then skip
+    DEC bofg:BNE no_bomb                  \ bofg is timer/counter, if zero, then new bomb
+
+    LDX #&0
+.find_slot_loop                                 \ check that HI addr is zero => free slot
+    INX:                                        \ X =1,3,5,.. Need to loop once on 2
+    CPX bomb_addr: BCS no_bomb                   \ check bounds to loop based on bost
+    INX                                          \ X =2,4,6,.. Need to loop once on 2
+    LDA bomb_addr,X:BNE find_slot_loop                \ find a free bomb slot, HI addr = zero
+    \ X points to free slot HI addr
+    LDY #255
+.find_plane_loop            \todo limit by plane count?
+    INY:INY:INY:INY:INY:LDA(pls),Y:BMI find_plane_loop     \ find the active plane, unbounded loop
+    DEY:DEY:DEY:LDA(pls),Y:AND #&C0:BNE found_plane    \ is plane doing? then
+    INY:INY:INY:JMP find_plane_loop                \ else try next plane..
+.found_plane
+    INY:CLC:
+    LDA(pls),Y:ADC #&9D:STA bomb_addr-1,X           \ calculate LO bomb addr from plane addr + &029D
+    AND#7:EOR#7:STA plot_bomb_mod+1                 \ SMC save the mod, does not affect C flag
+    INY
+    LDA(pls),Y:ADC#2:STA bomb_addr,X                \ calc HI bomb addr, store in table
+    CLC                                             \\TODO special case when dont use lower line?  correct
+    LDA bomb_addr-1,X :ADC #&78:STA bomb_lower_addr-1,X  \ calc LO, HI, lower line addr
+    LDA bomb_addr,X :ADC #2:STA bomb_lower_addr,X 
+    \ LDA bomb_lower_addr-1,X                         \AF merge above
+    \ AND#7:EOR#7:STA plot_bomb_mod+1                 \ SMC save the mod, does not affect C - to test!!
+    \\ setup SMC addrs for plotting
+    \CLC         \ X is 2,4,6, stores 52,54
+    TXA:ADC #bomb_addr-1: STA plot_bomb_upper1+1: STA plot_bomb_upper2+1
+    TXA:ADC #bomb_lower_addr-1: STA plot_bomb_lower1+1: STA plot_bomb_lower2+1
+    JSR plot_bomb                           \ first draw plot_bullet_sprite
+    LDY #0
+
+    LDA inb:STA bofg                        \ store inb timer in bofg, inb &F0,&EF,&EF,&EE,&EE,
+    INC bomb_count;                          \ inc for a new bomb
+.no_bomb
+    LDA #&C0:ORA bofg:STA bofg:RTS          \ OR with %1100 0000, sets bit 6 and 7,prevents more bombs being created.
+                                            \ => no change until inb decremented many times, > 32 levels?
+ } 
+ 
+\\ fast XOR plotting, using a source table of ZP addresses, not a single ZP addr.
+\\ more SMC by the calling function
+\\ calling code to INC plot_bomb_lower1, plot_bomb_lower2, etc
+\\ dedicate ZP for table and use LDA(bulst,X)
+\\ uses Y only, so X used in calling code loop
+\\ 
+.plot_bomb
+    bullet_sprite_length=&05  
+    LDY #bullet_sprite_length               \ 6 bytes per bullet/bomb
+    LDA plot_bomb_mod+1                     \ set in new_bomb, SMC
+    CMP #5:BPL plot_bomb_upper1                  \ if all pixels are in top line, go to top
+    \to do is above a CPY?  when length changes?
+ 
+.plot_bomb_lower1                       \ plot pixels on lower screen line MODE 2
+    LDA(bomb_lower_addr+1),Y:             \ SMC bomb_lower_addr is modified by calling code, &62, &64
+    EOR #&2A:
+.plot_bomb_lower2
+    STA(bomb_lower_addr+1),Y
+    DEY                                 \ Y-1, loop until Y = mod
+.*plot_bomb_mod
+    CPY #&FF:BNE plot_bomb_lower1          \ SMC -not FF, set above.    
+
+.plot_bomb_upper1                       \ plot pixels on upper screen line MODE 2
+    LDA(bomb_addr+1),Y:
+    EOR #&2A:
+.plot_bomb_upper2 
+    STA(bomb_addr+1),Y
+    DEY:BPL plot_bomb_upper1             \ Y-1, loop until 0
+    RTS
+
+\\ Move bombs - fast
+\\ bost - bomb slot table in ZP 
+\\ bomb moves 2 pixels per cycle  sd AND #7 is 0,2,4,6
+\\ uses memory addresses, no X,Y.
+\\ TO DO - vary pixels per cycle rate, maybe vary with gravity.
+\\ TO DO add Y- coord - do we need it?
+\\ bomb_addr=&51
+.move_bombs 
+{
+    \\TO DO AF bomb_addr is confusing as &51 - better if redefine as &52
+    NOP         \ RTS or NOP
+    \LDY #0    
+    \ load immediate zp address of start of bomb table, &52,&62 store in plot SMC
+    \ loads 50, 60 then incremented below
+    LDA #bomb_addr-1: STA plot_bomb_upper1+1: STA plot_bomb_upper2+1
+    LDA #bomb_lower_addr-1: STA plot_bomb_lower1+1: STA plot_bomb_lower2+1
+    \ get mod - needed to unplot
+    LDA bomb_addr+1: AND#7:EOR#7:STA plot_bomb_mod+1                 \ SMC save the mod, does not affect C - to test!!
+
+    LDX #&00        \\bomb_addr=&51, first addr at &52
+.next_bomb_loop  
+    \ X is 0,2,4,6 on loops - 0 means 1 bomb, 2 is 2, 4 is 3,
+    \INX:                                   \ any faster way than 8x INC?
+    INC plot_bomb_upper1+1: INC plot_bomb_upper2+1      \ move to next in bomb list
+    INC plot_bomb_upper1+1: INC plot_bomb_upper2+1
+    INC plot_bomb_lower1+1: INC plot_bomb_lower2+1
+    INC plot_bomb_lower1+1: INC plot_bomb_lower2+1
+    LDA bomb_addr+2,X                               \ check HI addr in bomb_addr, XX=&53,55,
+    BNE unplot                                      \ if zero bomb_addr+1, => bomb destroyed prev cycle, or never existed.
+            \TODO? if is never used empty slot, then do not unplot.  Same as zero case?
+        LDA #&7F:AND bofg:STA bofg:BNE next_bomb \always   \ so mask bofg, clear top bit, show there is >0 empty slot
+.unplot 
+    JSR plot_bomb                  \ undraw plot_bullet_sprite
+    \\ move bomb - update addr in table
+.upper_addr
+    
+    LDA bomb_addr+1,X :AND #7
+    CMP #6:BPL upper_next_line                          \ if pixel = 6 %0110 then new line
+        INC bomb_addr+1,X:INC bomb_addr+1,X:            \ add 2 pixels, or add &027A
+        JMP skip_16bit_add 
+.upper_next_line                                        \ moves to new MODE2 line
+    CLC:
+    LDA bomb_addr+1,X:ADC #&7A:STA bomb_addr+1,X         \ add &0278+2=&027A to bomb screen address (1 rows)
+        AND#7:EOR#7:STA plot_bomb_mod+1                 \ SMC save the mod, does not affect C - to test!!
+    LDA bomb_addr+2,X:ADC #2:STA bomb_addr+2,X
+.skip_16bit_add
+    \LDA bomb_addr+1,X:AND#7:EOR#7:STA plot_bomb_mod+1  \ SMC save the mod, does not affect C - to test!!
+
+.lower_addr
+    LDA bomb_lower_addr+1,X:AND #7
+    CMP#6:BPL lower_next_line                       \ if pixel = 6 %0110 then new line
+        INC bomb_lower_addr+1,X:INC bomb_lower_addr+1,X:
+        JMP check_bottom
+.lower_next_line                                     \ moves to new MODE2 line
+    CLC
+    LDA bomb_lower_addr+1,X:ADC #&7A:STA bomb_lower_addr+1,X        \ add &027A to bomb screen address (1 rows)
+    LDA bomb_lower_addr+2,X:ADC #2:STA bomb_lower_addr+2,X
+
+.check_bottom                                       \TODO - this writes to 8000+mem, ROM, stop earlier?
+    LDA bomb_addr+2,X
+    CMP #&80:BCC bomb_redraw                        \ was BMI, BCCcheck bottom of screen
+        DEC bomb_count;    
+        LDA #0:STA bomb_addr+2,X:BEQ next_bomb \always      \ yes, bomb hits bottom; set bomb[1]=0
+.bomb_redraw
+    JSR plot_bomb                  \ re-draw plot_bullet_sprite
+.next_bomb  
+    INX:INX  \ swap X and bomb addr, or INXm
+    CPX bomb_addr:BCC next_bomb_loop        \ 2,4 will equal bomb_addr another bomb? then loop, or exit 
+    \BEQ next_bomb_loop                      \ TODO use BCC is BLT, less than
+    RTS                                     \ loop is 127 bytes, cannot extend!!n
+}
+
+
+
 \\ Move bombs
 \\ bost - bomb slot table  
 \\ bomb moves 2 pixels per cycle  sd AND #7 is 0,2,4,6
@@ -629,17 +788,18 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 .ntbo 
     INY:LDA(bost),Y:STA sd:                 \load bomb into zero page sd
     INY:LDA(bost),Y:STA sd+1
-    BNE bo1                                 \ if zero sd+1, => bomb already destroyed
+    BNE bo1                                 \ if zero sd+1, => bomb destroyed prev cycle
         LDA #&7F:AND bofg:STA bofg:JMP bo7  \ so mask bofg, clear top bit
 .bo1 
     JSR plot_bullet_sprite                  \ undraw plot_bullet_sprite
     LDA sd:AND#7:CMP#6:BPL bo2              \ if pixel = 6 %0110 then new line
     INC sd:INC sd:LDA sd+1:JMP bo4          \ else sd=sd+2
-.bo2    \ new line
+.bo2                                        \ new line
     CLC:LDA sd:ADC #&7A:STA sd              \ add &027A to bomb screen address (1 rows)
     LDA sd+1:ADC #2:STA sd+1
 .bo4 
     CMP #&80:BMI bo6                        \ check bottom of screen
+    DEC bomb_count;    
     LDA #0:STA(bost),Y:BEQ bo7 \always      \ yes, bomb hits bottom; set bomb[1]=0
 .bo6 
     JSR plot_bullet_sprite                  \ re-draw plot_bullet_sprite
@@ -700,7 +860,7 @@ ORG &2CF0           \ some space
 \ORG &2D47
 
 \.L2D47
-.bomb_list                \ pointer to this in zero page bost=&8C
+.bomb_list_old                \ pointer to this in zero page bost=&8C
         EQUB    $02     \ no of bombs, default 2
         EQUB    $D6,$00,$00,$00,$00,$00,$00
         EQUB    $00,$00,$00,$00,$00,$00,$00,$00

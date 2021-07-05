@@ -38,7 +38,8 @@
    LDX #0:LDY#7:JSR def_log_colour           \ define background as white? temp flash.
    LDA #7:LDY #HI(sound_player_hit):LDX #LO(sound_player_hit):JSR osword       \ Sound  sound_player_hit
    LDA #&FF:STA gex                          \ counter for explosion
-   LDA #&60:STA nbo:STA np:STA mg:STA nb     \ this stores RTS in each routine, disabling them SMC
+   LDA #&60:STA nbo:STA np:STA mg
+   STA nb: STA new_bomb     \ this stores RTS in each routine, disabling them SMC
    JSR plot_gun_sprite                       \ un-draw sprite was .gun
    \ AF align to published as LDA #&1A , was LDA #&A
    LDA #HI(other_sprite_addr):STA gun+4
@@ -76,7 +77,7 @@
 .h9 DEY:DEY:
 .h10 DEY:DEY:BNE h6
 .h7                              \ modify these routines, replacing RTS with the NOP opcode, &EA
-   LDA #&EA:STA nbo:STA nb:STA np :STA mg
+   LDA #&EA:STA nbo:STA nb:STA np :STA mg: STA new_bomb
 
    \ AF 6/6/2021 removed this line
    \  DEC gex+1:BEQ govX                   \ renamed govX but .gov is in SS, so cannot BEQ that far

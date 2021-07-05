@@ -38,8 +38,10 @@
   JSR mg                    \ Move gun, mg, player moves?m
   JSR mb                    \ Move bullet
   JSR nb                    \ New bullet, nb, player fires?
-  JSR mbo                   \ Move bombs
-  JSR nbo                   \ New bombs nbo 
+  \JSR mbo                   \ Move bombs
+  JSR move_bombs                   \ Move bombs
+  \JSR nbo                   \ New bombs nbo
+  JSR new_bomb                   \ New bombs nbo  
   JSR pg                    \ Move bird, was B%
   JSR gun_hit_display       \ Player Hit processing, was H%
   JSR sor                   \ gravestones, score?
@@ -55,16 +57,18 @@
 EQUB 30, 30, 28, 28, 26, 26, 24, 24    \ -2 on odd levels
 
 .level_bullet_count   \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
+\todo 12 in L1 appears to cause a crash!!
 EQUB 8, 8, 12, 16, 16, 16, 16, 16
 .level_bullet_interval 
 EQUB 6, 8, 12, 12, 12, 12, 12, 12
-.level_bomb_count 
+.level_bomb_count   \ allow up to 7 x 2 byte bombs (16 byte space in zp)
 \EQUB 2, 2, 4, 4, 2, 2, 4, 4  
-EQUB 3, 4, 5, 4, 4, 4, 4, 4  
+EQUB 4, 8, 16, 4, 4, 4, 4, 4  
 .level_inb
 .level_bomb_interval
 \EQUB &EF,&EF,&EE,&EE,&ED,&ED,&EC,&EC
-EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
+\EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC */
+EQUB &EC,&E9,&EA,&E9,&ED,&ED,&EC,&EC
 \timer=C => room for 3 on screen
 
 \\ try one plane per level to speed up testing.
@@ -78,7 +82,9 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
   LDA #22:JSR oswrch                  \ select MODE 2 via OSWRCH
   LDA #2:JSR oswrch     
   \ intialise to zero counters, scores
-  LDA #0:STA exg3:STA cnt:STA fc:STA picn:STA gex:STA sc+1:STA sc+2:STA plf:CLC
+  LDA #0:STA exg3:STA cnt:STA fc:STA picn:STA gex:STA sc+1:STA sc+2:STA plf:
+  STA bomb_addr+2:STA bomb_addr+3:STA bomb_addr+4:STA bomb_addr+5  \AF July
+  CLC
   \LDA #32:STA de
   LDA #3:STA ti       \ ti=de+1 initial timer value first plane to fly
   LDA #42:STA ti+1    \ default timer value  was de+2, subsequent timer 
@@ -86,8 +92,8 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
 
   LDA #LO(bullet_list):STA bulst
   LDA #HI(bullet_list):STA bulst+1
-  LDA #LO(bomb_list):STA bost
-  LDA #HI(bomb_list):STA bost+1
+  LDA #LO(bomb_addr):STA bost   \todo no longer used, no table is in ZP
+  LDA #HI(bomb_addr):STA bost+1
   LDA #LO(plane_list):STA pls
   LDA #HI(plane_list):STA pls+1
 
@@ -159,10 +165,10 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
   LDY fc: DEY               \ zero based , first level=0
   LDA level_de,Y: STA de
   LDA level_bomb_interval,Y
-  STA inb
+  STA inb: LDA#&3F: STA bofg   \AF July initiliase?
   LDA level_bomb_count,Y
   \STA tm+1:  \LDA tm+1:
-  STA bomb_list              \ allow up to 4 bombs
+  STA bomb_addr              \ allow up to 4 bombs
   LDA level_bullet_count,Y
   STA bullet_list             \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
   LDA #30:                    \ TEST set to 10, 2 planes
@@ -287,7 +293,8 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
   LDA #0:STA sc             \ clear score byte for next cycle
                             \ fall through to display score
 \  RTS 
-\ sor end
+}
+\\ sor end
 
 \\ Writes the score to screen
 \\ calls plot_score with A=Sprite offset
@@ -295,6 +302,7 @@ EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC
 score_sprite_dest=&34B0
 .s7
 .score_update_screen 
+{
   LDA #HI(score_sprite_dest):STA sd+1:
   LDA #LO(score_sprite_dest):STA sd:
   LDA #HI(score_sprite_base):STA sf+1:

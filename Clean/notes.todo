@@ -43,3 +43,32 @@ Code Efficiency:
     ☐ keyboardScan loop high - always moving or waste?.
     ☐ tune t3 loop high - seems odd waste?.
     ☐ plot_pigeon_sprite - loop high - large sprite waste?.
+
+
+
+    pc	 instruction	 count	 cycles
+2632	BIT abs	1069227	1069840
+2635	BEQ branch	1069152	1782302
+2641	LDA (),y	24000	23507
+2643	STA (),y	24000	40006
+2645	DEY	24000	48000
+2646	BPL branch	24000	16016
+26b9	LDA abs,y	23994	23811
+26bc	BEQ branch	23997	32018
+26be	EOR (),y	16200	10808
+26c0	STA (),y	16194	26993
+26c2	DEY	23994	40208
+26c3	BPL branch	23997	4290983314
+2a72	LDA (),y	16872	15488
+2a74	BEQ branch	16872	28120
+2a78	STA (),y	10320	17640
+2a7a	DEY	16869	27186
+2a7b	DEX	16872	11254
+2a7c	CPX zp	16869	11246
+2a7e	BNE branch	16872	16874
+2a80	LDA (),y	21144	19760
+2a82	BEQ branch	21144	35240
+2a86	STA (),y	11658	19651
+2a88	DEY	21144	32802
+2a89	DEX	21144	14096
+2a8a	BPL branch	21144	14096
