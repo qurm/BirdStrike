@@ -63,15 +63,16 @@ EQUB 8, 8, 12, 16, 16, 16, 16, 16
 EQUB 6, 8, 12, 12, 12, 12, 12, 12
 .level_bomb_count   \ allow up to 7 x 2 byte bombs (16 byte space in zp)
 \EQUB 2, 2, 4, 4, 2, 2, 4, 4  
-EQUB 4, 8, 16, 4, 4, 4, 4, 4  
+EQUB 12, 8, 16, 4, 4, 4, 4, 4  \ max 14 bytes in table
 .level_inb
-.level_bomb_interval
+.level_bomb_interval \ bits 6,7 set bits 0-5 are counter, so &C0 + timer
 \EQUB &EF,&EF,&EE,&EE,&ED,&ED,&EC,&EC
 \EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC */
-EQUB &EC,&E9,&EA,&E9,&ED,&ED,&EC,&EC
-\timer=C => room for 3 on screen
-
-\\ try one plane per level to speed up testing.
+EQUB &1F,&24,&EA,&E9,&ED,&ED,&EC,&EC
+\timer=0F => room for 6 to 7 on screen at rate 3
+\timer=1C => room for 4 on screen; rate 3 will need to fall faster too.
+.level_bomb_rate \ bits 6,7 set bits 0-5 are counter, so &C0 + timer
+EQUB &02,&03,&03,&03,&04,&04,&04,&04
 
 \\ Start new game, was .S%
 \\ Intialise variables, setup screem
@@ -83,7 +84,8 @@ EQUB &EC,&E9,&EA,&E9,&ED,&ED,&EC,&EC
   LDA #2:JSR oswrch     
   \ intialise to zero counters, scores
   LDA #0:STA exg3:STA cnt:STA fc:STA picn:STA gex:STA sc+1:STA sc+2:STA plf:
-  STA bomb_addr+2:STA bomb_addr+3:STA bomb_addr+4:STA bomb_addr+5  \AF July
+  \make this a loop TODO
+  STA b_addr: STA b_addr+1:STA b_addr+2:STA b_addr+3:STA b_addr+4:STA b_addr+5  \AF July TODO full length
   CLC
   \LDA #32:STA de
   LDA #3:STA ti       \ ti=de+1 initial timer value first plane to fly
@@ -92,8 +94,8 @@ EQUB &EC,&E9,&EA,&E9,&ED,&ED,&EC,&EC
 
   LDA #LO(bullet_list):STA bulst
   LDA #HI(bullet_list):STA bulst+1
-  LDA #LO(bomb_addr):STA bost   \todo no longer used, no table is in ZP
-  LDA #HI(bomb_addr):STA bost+1
+  \LDA #LO(bomb_addr):STA bost   \todo no longer used, no table is in ZP
+  \LDA #HI(bomb_addr):STA bost+1
   LDA #LO(plane_list):STA pls
   LDA #HI(plane_list):STA pls+1
 
@@ -104,7 +106,7 @@ EQUB &EC,&E9,&EA,&E9,&ED,&ED,&EC,&EC
   DEX: CPX #7:BNE co1
 
   STX ra1          \ save X 7 in ra1
-
+  LDA#0: STA player_dies+1              \\ god-mode, player_dies=0, false
   LDA #player_live_init:STA gex+1        \\ player lives, 3
   \ LDA #&2F:STA plf+1
   LDA #HI(plane_sprite_addr):STA plf+1    \ LO addresses set per game frame
@@ -164,11 +166,16 @@ EQUB &EC,&E9,&EA,&E9,&ED,&ED,&EC,&EC
   \\ new level intialisation AF 29/6/21
   LDY fc: DEY               \ zero based , first level=0
   LDA level_de,Y: STA de
-  LDA level_bomb_interval,Y
-  STA inb: LDA#&3F: STA bofg   \AF July initiliase?
+  LDA level_bomb_interval,Y: ORA#&C0  \set bits 6,7
+  STA inb: \ LDA#&3F: 
+  STA bofg   \AF July initiliase?
   LDA level_bomb_count,Y
   \STA tm+1:  \LDA tm+1:
-  STA bomb_addr              \ allow up to 4 bombs
+  STA bomb_max_count              \ allow up to 4 bombs
+  LDA level_bomb_rate,Y:
+  STA bomb_vert_rate:CLC:ADC#&78:STA bomb_vert_LO 
+  EOR #7: AND#7:TAX:INX:STX bomb_vert_newline              \ 
+  
   LDA level_bullet_count,Y
   STA bullet_list             \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
   LDA #30:                    \ TEST set to 10, 2 planes

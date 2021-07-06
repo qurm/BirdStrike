@@ -79,8 +79,10 @@ bost=&8C        \ bomb start/list as are multiple
 cnt=&8E         \ counter for?
 
 bomb_count=&50   \AF 3/7/2021     current no of bomb, 0 is none, up to max bomb_list[0]
-bomb_addr=&51   \AF 3/7/2021    \list
-bomb_lower_addr=&61   \AF 3/7/2021
+bomb_max_count=&51   \AF 3/7/2021    \list
+\bomb_addr=&51   \AF 3/7/2021    \list
+b_addr=&52   \AF 3/7/2021    \list
+b_lower_addr=&62   \AF 3/7/2021
 \ Sprites memory locations - now defined in constants in source
 \ $.X is loaded at &1900 (scenery sprites etc - not clouds/enemies)
 \ $.X       001900 001900 000500         &1900 + &0500 = &1E00
