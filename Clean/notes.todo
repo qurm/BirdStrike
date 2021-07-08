@@ -3,7 +3,7 @@ Clean-up:
     ✔ Change buggy level incrementing to a table model - more transparent, better to tune. @done(21-06-30 11:41)
     ✔ Consolidate sound defintions etc @done(21-06-30 12:25)
     ☐ Flags for ass build to move through levels faster (less planes)
-    ☐ Flags for god-mode similar to aid testing, experimentation
+    ☐ Flags for god-mode similar to aid testing, experimentation @started(21-07-06 22:57)
     ☐ Check use of CMP, better use of BCC, BCS for unsigned comparisons
     ☐ Add bounds checks on all list scans > needs max size?
     ☐ Analyse X.bin, extract code/tables into source files.
@@ -12,12 +12,13 @@ Clean-up:
 Foundation:
     Simplify and improve performance to allow for new features
     ☐ List/counter pattern for multiple sprites (max/actual count, interval, empty slot)
-    ☐ Rework bomb code to allow > 2 bombs and incremental changes
-    ☐ Rework bomb code to allow incremental changes in speed by level
+    ✔ Rework bomb code to allow > 2 bombs and incremental changes @done(21-07-06 20:27)
+    ✔ Rework bomb code to allow incremental changes in speed by level @done(21-07-06 22:57)
+    need to reset cleanly beteen levels - some in progress
     ☐ Rework bomb code to allow physics, changes in speed, drift.
-    ☐ Optimise bullet/bomb sprite to unroll, use EOR#, ..
-    ☐ Use of ZP for selected lists, flags (bullet/bomb)
-    ☐ Use of dedicated ZP locations so not reloaded each cycle.
+    ✔ Optimise bullet/bomb sprite to unroll, use EOR#, .. @done(21-07-06 22:58)
+    ☐ Use of ZP for selected lists, flags (bullet/bomb) @started(21-07-06 22:57)
+    ☐ Use of dedicated ZP locations so not reloaded each cycle. @started(21-07-06 22:57)
     ☐ Move plane - optimise, allow for multiple planes, plane flag
     
 
@@ -44,6 +45,74 @@ Code Efficiency:
     ☐ tune t3 loop high - seems odd waste?.
     ☐ plot_pigeon_sprite - loop high - large sprite waste?.
 
+
+Top routines
+Based on 8/82021 profiler
+
+scr loop
+0x2632	BIT abs	10959490	4843922	0.441984253
+0x2635	BEQ branch	10959145	6889799	0.62868034
+
+plot_gun_sprite
+plotting every cycle, as collision detection is based on reading screen
+0x26bd	LDA abs,y	258353	1036702	4.012734514
+0x26c0	BEQ branch	258334	601941	2.33008818
+0x26c2	EOR (),y	174388	4293855962	24622.42793
+0x26c4	STA (),y	174385	1049046	6.015689423
+0x26c6	DEY	258339	4291485550	16611.83774
+0x26c7	BPL branch	258355	769855	2.979833949
+
+
+plot_plane top
+large sprite so many cycles
+BEQ branch skips about 45% bytes, takes 2.4c saves 45% of 11c - OK
+A branch not taken requires two machine cycles. Add one if the branch is taken
+0x2a80	CPX zp	    174735	4293491605	24571.44593
+0x2a82	BNE branch	174733	4293447868	24571.47687
+0x2a84	LDA (),y	224863	4294091917	19096.4806
+0x2a86	BEQ branch	224853	550487	2.448208385
+0x2a88	EOR (),y	124201	634534	5.108928269
+0x2a8a	STA (),y	124190	745346	6.001658749
+0x2a8c	DEY	        224857	449880	2.000738247
+0x2a8d	DEX	        224870	4291417207	19083.99167
+0x2a8e	BPL branch	224865	624804	2.778573811
+
+plot_plane bottom
+0x2a76	LDA (),y	174736	4293841257	24573.30634
+0x2a78	BEQ branch	174728	417509	2.389479648
+0x2a7a	EOR (),y	106782	4291516426	40189.51158
+0x2a7c	STA (),y	106776	640827	6.001601483
+0x2a7e	DEY	        174734	349601	2.000761157
+0x2a7f	DEX	        174733	349586	2.000686762
+
+keyboardScan
+could reduce?  alternate cycles?
+0x195a	LDA imm	67233	104422	1.553136109
+0x195c	LDY imm	67237	104498	1.554174041
+0x195e	JSR abs	67238	313203	4.65812487
+0x1961	INX	    67239	104426	1.553057006
+0x1962	RTS	    67240	313296	4.659369423
+
+ge4 wait for press space at game start/end
+0x14d6	LDX imm	57549	85064	1.478114303
+0x14d8	JSR abs	57552	255108	4.43265221
+0x14db	BNE branch	57551	127540	2.216121353
+
+
+LDA (LoaD Accumulator)
+Affects Flags: N Z
+
+MODE           SYNTAX       HEX LEN TIM
+Immediate     LDA #$44      $A9  2   2
+Zero Page     LDA $44       $A5  2   3
+Zero Page,X   LDA $44,X     $B5  2   4
+Absolute      LDA $4400     $AD  3   4
+Absolute,X    LDA $4400,X   $BD  3   4+
+Absolute,Y    LDA $4400,Y   $B9  3   4+
+Indirect,X    LDA ($44,X)   $A1  2   6
+Indirect,Y    LDA ($44),Y   $B1  2   5+
+
++ add 1 cycle if page boundary crossed
 
 
     pc	 instruction	 count	 cycles
