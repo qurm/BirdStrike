@@ -392,6 +392,16 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 }
 \\ End of Plane Explosion plotting
 
+\\ Plane lists
+\\ |?0| 1| 2| 3| | | | | |          \ pos, pos+1
+\\ |LO|HI|LO|HI|LO|HI|LO|HI         
+\\ |?0| 1| 2| 3| | | | | |          \ bomb_lower_addr in ZP
+\\ |LO|HI|LO|HI|LO|HI|LO|HI   
+\\ |00| 1| 2| 3| | | | | |          \ bomb_y    Y coord, 160 rows, 0 is top
+\\ | X| Y| X| Y|                    \   X coord
+\\ |00| 1| 2| 3| | | | | |          \ ? any other status byte?
+\\ | S| S| S|
+
 
 \\ Move plane
 \\ Logic for random Left/Right and following player
@@ -548,6 +558,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ Plane plot ..
 \\ sprite plotting using XOR in MODE 2, when sprite 
 \\  spans 2 lines uses 'top' and 'bottom' loops to write pixels across lines.
+\\ Profiler shows this loop is heaviest cycle count
 \\ Called from start_game, .fo, after plane is plotted
 \\ input:
 \\ plf plane sprite from address, zero page
@@ -555,6 +566,13 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ used:
 \\ st   sprite "to" address, zero page
 \\ pos   to address, zero page
+\\ TODO - change LDA(plf),Y to Absolute,Y - save 25%
+\\ TODO - unroll X inner loop, plot all cols together in parallel? Lose the BEQ benefit?
+\ LDA (LoaD Accumulator)
+\ MODE           SYNTAX       HEX LEN TIM
+\ Absolute,Y    LDA $4400,Y   $B9  3   4+
+\ Indirect,X    LDA ($44,X)   $A1  2   6
+\ Indirect,Y    LDA ($44),Y   $B1  2   5+
 .pp
 .plot_plane
 {
@@ -570,7 +588,8 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     LDX #7:CPX mod:BEQ tp           \ if mod=7 then goto tp, top, else bottom
 
 .bt                                 \ bottom
-    LDA (plf),Y:BEQ bz              \ optimisation, skip plotting zero bytes
+    LDA (plf),Y:BEQ bz              \ optimisation, skip plotting zero bytes 
+                                    \ BEQ branch skips about 45% bytes, takes 2.4c saves 45% of 11c - OK
     EOR (st),Y:STA (st),Y           \ XOR write to screen
 .bz DEY
     DEX:CPX mod:BNE bt              \ repeat inner loop until X=0
@@ -628,7 +647,21 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
                                             \ => no change until inb decremented many times, > 32 levels?
 }
 
+\\ bomb lists
+\\ |50| 1| 2| 3| | | | | |          \ bomb_addr in ZP
+\\ |LO|HI|LO|HI|LO|HI|LO|HI         
+\\ |60| 1| 2| 3| | | | | |          \ bomb_lower_addr in ZP
+\\ |LO|HI|LO|HI|LO|HI|LO|HI   
+\\ |00| 1| 2| 3| | | | | |          \ bomb_y    Y coord, 160 rows, 0 is top
+\\ | X| Y| X| Y|                    \ ? any other status byte?  X coord
 
+\\ Use of bofg      zp at &73
+\\ Set in nbo from inb, as &F0,&EF,&EF,&EE,&EE by level
+\\ move plane: clears bit 6 on bofg - to show plane is flying (not explosion)
+\\ move bomb: clears bit 7 on bofg when bomb is destroyed
+\\ nbo DEC and checks bofg timer to release a new bomb
+\\ bofg low bits are timer &F, reducing by level
+\\ bofg high bits are %1110, 
 .new_bomb       \TODO AF X should be zero based.
 {
     NOP                             \  Gets changed to RTS by gun_hit_display

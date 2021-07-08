@@ -114,6 +114,23 @@ Indirect,Y    LDA ($44),Y   $B1  2   5+
 
 + add 1 cycle if page boundary crossed
 
+PRofiler features
+count reads and writes to 
+- program space
+- data space
+- zero page
+- stack
+
+Display - any charts lib
+- Heatmap 16x16, or scatter plot
+- tree/ node map
+chart.js - open, popular
+D3 Data Driven Documents. - related to dom data.  Other libs built on this.
+Plotly - built on D3 - needs dom?
+Google charts - HTML5
+
+Characterise by op-code
+Heatmap 16x16
 
     pc	 instruction	 count	 cycles
 2632	BIT abs	1069227	1069840
