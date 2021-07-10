@@ -34,8 +34,6 @@
 .gov2 
   EQUB &1F, &05, &0F              \ oswrch, move cursor to &05, &0F, COL 1
   EQUB &11, &01                   \ oswrch, set COL 1
-  \EQUD &110F051F                
-  \EQUB 1:
   EQUS "GAME OVER"
 }
 \\ End of game_over - Display GAME OVER message
@@ -55,24 +53,24 @@
   JSR wbmsg:LDY #75:
 .bon1 
   SED:CLC:
-  LDA sc+1:ADC#2:STA sc+1:LDA sc+2:ADC#0:STA sc+2 \ Add 2 to score
+  LDA sc+1:ADC#2:STA sc+1:
+  LDA sc+2:ADC#0:STA sc+2               \ Add 2 to score
   CLD
-  LDA #2:JSR delay                          \ then delay for 2x20 = 40ms
+  LDA #2:JSR delay                         \ then delay for 2x20 = 40ms
   TYA:PHA
   LDX #LO(sound_bonus):LDY#HI(sound_bonus) 
-  LDA #7:JSR osword                          \ OSWORD - A=7 SOUND command at &2DF8
+  LDA #7:JSR osword                         \ OSWORD - A=7 SOUND command at &2DF8
   JSR score_update_screen                   \ display score
   PLA:TAY:DEY:BNE bon1
   INC bsou                                \ why? byte 1 from &FF to 00
   LDX #LO(bsou):LDY #HI(bsou)              \sound defined below
-  LDA #7:JSR osword                       \OSWORD - A=7 SOUND command at bsou
+  LDA #7:JSR osword                      \ OSWORD - A=7 SOUND command at bsou
   DEC bsou
   LDA #&80:ORA sc:STA sc                    \ set score flag
   RTS
 }
 
 \\ Write Bonus message
-
 .wbmsg 
 {  
   LDY #0:
@@ -269,8 +267,8 @@ stave_base_addr = &2688   \Adds 0A, so &3088, 3A88,...
 \\ Called from Game End routine above
 .whs
 {
-  PHA: LSRA:LSRA:LSRA:LSRA          \ Push A, multiply x 16
-  CLC:ADC #&30:JSR &FFE3            \ add &30, call OSASCI, write line feed
+  PHA: LSRA:LSRA:LSRA:LSRA          \ Push A, BCD number, divide x 16 to move to low nibble
+  CLC:ADC #&30:JSR &FFE3            \ add &30 to make ASCII, call OSASCI, write line feed
   PLA: AND #&F:CLC:ADC #&30         \ Pull A, mask 4 high bits, add &30
   JMP &FFE3                         \ call OSASCI/OSWRCH and RTS to calling code
 }

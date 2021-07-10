@@ -17,7 +17,7 @@
   \ Set Escape Disabled
   LDA #200:LDX #03:LDY #0:JSR osbyte    \OSBYTE &C8 (200) *FX 200 Read/write ESCAPE, BREAK 
   JSR space             
-  \ TODO source was missing these 4 line
+  \ source was missing these 4 line
   \ Added AF 6/6/2021
   LDX #&01: LDA #&04: LDY #&00
   JSR osbyte                  \ OSBYTE 04 Disable cursor editing, X=1
@@ -38,10 +38,8 @@
   JSR mg                    \ Move gun, mg, player moves?m
   JSR mb                    \ Move bullet
   JSR nb                    \ New bullet, nb, player fires?
-  \JSR mbo                   \ Move bombs
-  JSR move_bombs                   \ Move bombs
-  \JSR nbo                   \ New bombs nbo
-  JSR new_bomb                   \ New bombs nbo  
+  JSR move_bombs            \ Move bombs
+  JSR new_bomb              \ New bombs nbo  
   JSR pg                    \ Move bird, was B%
   JSR gun_hit_display       \ Player Hit processing, was H%
   JSR sor                   \ gravestones, score?
@@ -62,17 +60,14 @@ EQUB 8, 8, 12, 16, 16, 16, 16, 16
 .level_bullet_interval 
 EQUB 6, 8, 12, 12, 12, 12, 12, 12
 .level_bomb_count   \ allow up to 7 x 2 byte bombs (16 byte space in zp)
-\EQUB 2, 2, 4, 4, 2, 2, 4, 4  
-EQUB 12, 8, 16, 4, 4, 4, 4, 4  \ max 14 bytes in table
-.level_inb
+EQUB 4, 6, 8, 10, 12, 12, 12, 12  \ max 14 bytes in table
+\.level_inb
 .level_bomb_interval \ bits 6,7 set bits 0-5 are counter, so &C0 + timer
-\EQUB &EF,&EF,&EE,&EE,&ED,&ED,&EC,&EC
-\EQUB &EC,&EB,&EA,&E9,&ED,&ED,&EC,&EC */
-EQUB &1F,&24,&EA,&E9,&ED,&ED,&EC,&EC
+EQUB &2F,&27,&1F,&17,&0F,&0F,&0F,&0F
 \timer=0F => room for 6 to 7 on screen at rate 3
 \timer=1C => room for 4 on screen; rate 3 will need to fall faster too.
 .level_bomb_rate \ bits 6,7 set bits 0-5 are counter, so &C0 + timer
-EQUB &02,&03,&03,&03,&04,&04,&04,&04
+EQUB 02,03,03,03,04,04,04,04
 
 \\ Start new game, was .S%
 \\ Intialise variables, setup screem
@@ -94,7 +89,7 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
 
   LDA #LO(bullet_list):STA bulst
   LDA #HI(bullet_list):STA bulst+1
-  \LDA #LO(bomb_addr):STA bost   \todo no longer used, no table is in ZP
+  \LDA #LO(bomb_addr):STA bost   \todo no longer used, now table is in ZP
   \LDA #HI(bomb_addr):STA bost+1
   LDA #LO(plane_list):STA pls
   LDA #HI(plane_list):STA pls+1
@@ -108,7 +103,6 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
   STX ra1          \ save X 7 in ra1
   LDA#0: STA player_dies+1              \\ god-mode, player_dies=0, false
   LDA #player_live_init:STA gex+1        \\ player lives, 3
-  \ LDA #&2F:STA plf+1
   LDA #HI(plane_sprite_addr):STA plf+1    \ LO addresses set per game frame
 
   \\ new level intialisation AF 29/6/21
@@ -131,8 +125,6 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
 
 
 \\ Begin Level (next frame)
-\\ TO DO - Iains fix here
-\ de=&2D79  initialised with !de=&400314 (3 bytes, ti=&40)
 .bf 
   JSR cht                   \ call Change Tune, returns A=? X=?
   STX nl:INC fc:            \ increment frame counter, game level  X=7??
@@ -149,8 +141,6 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
   LDY #cloud_sprite_offset_list - bullet_list -1
 .b1 
   STA bullet_list,Y: DEY: BNE b1      \ clear &54 bytes at &2D0A (bullet_list set to 0)
-
-
 .b0
   LDA #12:JSR oswrch              \ OSWRCH clear the screen
   LDA #154:LDX #20:JSR osbyte     \ OSBYTE Write to video ULA control register and OS copy 
@@ -159,7 +149,6 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
   JSR stv                         \ Draw the musical stave, stv?
   JSR score_update_screen         \ Write the score to screen
 
-  
   LDA #0:STA plane_kill_count:
   STA sc:STA ba+1
 
@@ -181,9 +170,6 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
   LDA #30:                    \ TEST set to 10, 2 planes
   STA plane_list              \ allow up to 6 x 5 byte planes AF TEST was 30
 
-  \LDA tm+1:STA bomb_list              \ allow up to 2? bombs
-  \LDA #12:STA bullet_list             \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
-  \LDA #10:STA plane_list              \ allow up to 7 x 4 byte planes AF TEST was 30
   note_screen_addr = &3088
   gun_screen_addr = &3280             \ or 3288?
   LDA #LO(note_screen_addr):STA not
@@ -214,13 +200,23 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
   LDA sd+1:ADC #0               \ add 16 bit carry
   STA plane_list,X: STA sd+1    \  HI address=element 3
   CLC:INX
-  LDA sf:ADC #10      
-  STA sf:STA plane_list,X       \  81, 95, 9F, A9, B3, BD = element 4 psta?
+  LDA sf:ADC #10                \ each plane is &50 bytes, 10 X-coord apart
+  STA sf:STA plane_list,X       \ 81, 95, 9F, A9, B3, BD = element 4 psta
   INX
   LDA #&D0:STA plane_list,X     \ y-coord? &D0 - sort of flag, sprite offset?
   \TODO use BCC compare with 30, use bullet_list 
   INX:CPX #31:BMI pp1           \ loop 6 times, X inc 5 each cycle
   \INX:CPX #16:BMI pp1           \ loop 6 times, X inc 5 each cycle  AF TEST
+
+\ for future use - simplified plane list setup
+  \LDX #0
+  \LDA #LO(plane_screen_addr):STA sf     \ &81, uses sf as a temp workspace
+  \CLC
+\.plane_setup_loop
+\  LDA sf:ADC #10                \ each plane is &50 bytes, 10 X-coord apart
+ \ STA sf:STA plX,X       \ 81, 95, 9F, A9, B3, BD = element 4 psta
+\  INX
+\  CPX #6: BCC plane_setup_loop
 
   LDY #0
   LDA (pls),Y:STA no            \ plane_list, 0 is &1E,30 = 6 planes, 5 bytes
@@ -232,7 +228,6 @@ EQUB &02,&03,&03,&03,&04,&04,&04,&04
   INY:INY:CPY no:BMI slop
   JSR h7
 
- \ gun_sprite_addr = &2358
   gun_init_screen_addr = &7E90
 .sgun                   \ Setup gun, initial screen position etc
 .player_gun_initialise
@@ -370,7 +365,7 @@ score_sprite_dest=&34B0
 
 \\ Next level setup 
 \\ Called from score routine
-\\ Calls
+\\ Calls delay
 .next_level
 .ef 
   LDA #0:STA sc             \ clear score byte for next cycle
@@ -397,19 +392,6 @@ score_sprite_dest=&34B0
   LDA#34:LDX#38                  \ else fc 3, then return A=34, X=38
   RTS
 \\ End of Choose Tune
-
-
-\\ Patch for Move Plane - improved randomness
-\\ Called from mp
-\\ DONE moved into mp routine
-\.patch 
-\  LDA ra1:BPL patch2:
-\  LDA sd:EOR #&C0:STA sd          \ XOR top bit of address
-\.patch2 
-\  LDA de                         \dirn when above
-\  RTS
-\\ End of Patch for Move Plane 
-
 
 \\ Plot Next Note 
 \\ Calls pno, plot_note
@@ -511,13 +493,16 @@ score_sprite_dest=&34B0
   LDX #LO(sound_note):LDY #HI(sound_note)
   LDA #7:JSR osword                   \ OSWORD - A=7 SOUND command at &2DF8
   INC no:INC no:JMP t1                \ increment Y + 2, loop
-   
+
+\\ Profiler shows this loop is fairly heavy cycle count
+\\ TODO - any better way to wait for sound?  Game is idle anyway?
 .t3                                   \ loop get sound, until Sound channel is clear?  < 15
   LDA #&80:LDX #250:JSR osbyte        \ OSBYTE 128 Get Sound Channel 1 buffer status in Y
   CPX #15:BMI t3                      \ X contains spaces in sound buffer, loop until buffer is empty
   RTS                                 \ then tune has played, can return.
 
-\\ Keyboard scan - check for key press
+\\ Keyboard scan - check for key press, passed in X
+\\ Called from check_key_press below
 \\ input X = negative INKEY value, Y set to FF 
 \\ output X = X and Y contain &FF if the key being scanned is pressed.
 .keyboardScan
@@ -532,20 +517,23 @@ score_sprite_dest=&34B0
 \\ Note this writes OSWORD vector at &20C, turning sound on and off.
 \\ checking for R, S, Q on keyboard
 .check_key_press
-.opt 
+ 
 {
+  DEC keycounter                    \ optimise - check key every N cycles
+  BNE checkKeyComplete
+  LDA #5:STA keycounter
 .checkQkey
-  LDX #&EF:JSR key:BNE op1          \ EF=-17 INKEY Q, Quiet
-  LDA #LO(mute):STA &20C            \ rewrite OSWORD vector to below .mute
+  LDX #&EF:JSR key:BNE checkSkey          \ EF=-17 INKEY Q, Quiet
+  LDA #LO(mute):STA &20C                  \ rewrite OSWORD vector to below .mute
   LDA #HI(mute):STA &20D
-.op1 
+ 
 .checkSkey
-  LDX #&AE:JSR key:BNE op2           \ AE=-82 INKEY S, Sound
+  LDX #&AE:JSR key:BNE checkRkey           \ AE=-82 INKEY S, Sound
   LDA soun:STA &20C:
   LDA soun+1:STA &20D
-.op2 
+ 
 .checkRkey
-  LDX #&CC:JSR key:BNE op5          \ CC=-52 INKEY R, Rest
+  LDX #&CC:JSR key:BNE checkKeyComplete          \ CC=-52 INKEY R, Rest
 .op3  
   LDA #&81:LDY #1:LDX #0:JSR osbyte:  \OSBYTE 129 Read key, scan for 1s, keyboard scan for X (value?)
   BCS op3:        \If Carry is set, no key, loop
@@ -554,7 +542,9 @@ score_sprite_dest=&34B0
 .op5 
 .checkKeyComplete
   RTS
-  
+
+.keycounter
+EQUB 1
 .mute                               \ OSWORD vector points here when Q/mute
     CMP #07:BEQ op5                 \ exit if OSWORD &07
 .mu1 
@@ -564,7 +554,6 @@ score_sprite_dest=&34B0
 .soun                               \ OSWORD vector restored from here
   EQUW &E7EB
 \\ End of Check Key presses for user input
-
 
 
   .end_SS_03
