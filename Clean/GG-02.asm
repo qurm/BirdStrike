@@ -199,8 +199,8 @@ bullet_rate=5                           \ move N pixels/lines per cycle, not cha
     DEY:DEY:DEY
     LDA exp:STA(bulst),Y:                  \ restore from zp to bulst
     INY:LDA sd:  STA(bulst),Y:
-    INY:LDA sd+1:STA(bulst),Y:
-    INY
+    INY:LDA sd+1:STA(bulst),Y
+    INY                                     \ no need to save X-coord, unchanged.
     \ CPY no:BMI ntbu                       \ AF 28/6/21
     CPY no:BCC ntbu                         \ if Y<no, then loop
     RTS
@@ -226,26 +226,22 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     JSR osbyte                         \ OSBYTE 129 Read key, keyboard scan for ENTER -74
     INX:BEQ nwb1                        \ if pressed, fire
 
-    LDA #&00:STA fp0 \: RTS             \ else SMC updates fp0
+    LDA #&00:STA fp0                     \ else SMC updates fp0
 .nwb0 
     RTS
 .fp0 
     EQUB 0                        \ fp0 counter modified below TODO move to ZP
 
 .nwb1 
-    \ LDA #2:BIT bfg
-\\\\\\\\\\\\\\\\ fpat \\\\\\\\\\\\\\\\
     LDA fp0:BEQ fp1             \ decrement counter, return if > 0
     DEC fp0:RTS
 .fp1 
-   LDA #18:STA fp0             \ reset counter to 18
-\  JMP nwb_patch_return        \ &297D
-\\\\\\\\\\\\\\\\ end fpat \\\\\\\\\\\\\\\\
-
+    LDA #18:STA fp0             \ reset counter to 18
     LDY #&FF                            \ proceed to fire again
 .nwb2 
-    INY:INY:INY:INY                     \  Y is 3, 7, 11
+    INY:INY:INY:INY                     \  Y is 3, 7, 11  TODO DEBUG here
     CPY bullet_list: BCS nwb0           \ Y>=bulst dont search beyond bullet list length
+
     LDA(bulst),Y:BNE nwb2               \ search for unused list entry, bulst[2] = 0, no check on bounds
     DEY:DEY
     LDA #bullet_init_y:STA(bulst),Y:    \ bulst[0] = 9D is y coord, 175 at gun tip, reducing upwards
@@ -645,7 +641,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     DEX                                 \ X points to HI addr
     LDA b_addr,X:BEQ find_plane               \ check that HI addr is zero => free slot
     DEX:BNE  find_slot_loop                 \ X =6,4,2,0.. Need to loop at least once
-    BEQ no_bomb             
+    BEQ no_bomb                 
 
 .find_plane
     DEX
@@ -689,7 +685,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     bomb_sprite_byte=&2A                    \maybe in ZP? change per sprite?
     bullet_sprite_length=&05  
     LDY #bullet_sprite_length               \ 6 bytes per bullet/bomb
-    AND#7:EOR#7:STA plot_bomb_mod+1         \ Calc mod. A=b_addr-1,X from calling code, SMC
+    AND#7:EOR#7:STA plot_bomb_mod+1         \ Calc mod. A=b_addr,X from calling code, SMC
     CMP #5:BPL plot_bomb_upper1                  \ if all pixels are in top line, go to top
     \to do is above a CPY?  when length changes?
  
@@ -763,7 +759,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 .next_bomb  
     INX:INX  \ swap X and bomb addr, or INXm
     CPX bomb_max_count:BCC next_bomb_loop        \ 2,4 will equal b_addr another bomb? then loop, or exit 
-    BEQ next_bomb_loop                      \ TODO use BCC is BLT, less than
+    \BEQ next_bomb_loop                      \ BCC is BLT, as zero-based is less than max
     RTS                                     \ loop is 127 bytes, cannot extend!!n
 }
 

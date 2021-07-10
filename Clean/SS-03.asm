@@ -57,7 +57,7 @@ EQUB 30, 30, 28, 28, 26, 26, 24, 24    \ -2 on odd levels
 .level_bullet_count   \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
 \todo 12 in L1 appears to cause a crash!!
 EQUB 8, 8, 12, 16, 16, 16, 16, 16
-.level_bullet_interval 
+.level_bullet_interval      \TODO this is fixed in new_bullet as 18
 EQUB 6, 8, 12, 12, 12, 12, 12, 12
 .level_bomb_count   \ allow up to 7 x 2 byte bombs (16 byte space in zp)
 EQUB 4, 6, 8, 10, 12, 12, 12, 12  \ max 14 bytes in table
@@ -158,9 +158,10 @@ EQUB 02,03,03,03,04,04,04,04
   LDA level_bomb_interval,Y: ORA#&C0  \set bits 6,7
   STA inb: \ LDA#&3F: 
   STA bofg   \AF July initiliase?
-  LDA level_bomb_count,Y
+  SEC
+  LDA level_bomb_count,Y: SBC #2  \ allow up to N bombsm store N-2, as loops are zero-based
   \STA tm+1:  \LDA tm+1:
-  STA bomb_max_count              \ allow up to 4 bombs
+  STA bomb_max_count              
   LDA level_bomb_rate,Y:
   STA bomb_vert_rate:CLC:ADC#&78:STA bomb_vert_LO 
   EOR #7: AND#7:TAX:INX:STX bomb_vert_newline              \ 
