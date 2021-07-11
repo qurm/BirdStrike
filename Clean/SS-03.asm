@@ -30,6 +30,7 @@
 
 \\ Game main loop
 \\ run, until ESC pressed
+\\ the order of these can be important as flags are passed in the score byte
 .GO           
   JSR random1               \ update "random" numbers for use later R%      
   JSR scr                   \ wait for vsync timing 
@@ -56,12 +57,14 @@ EQUB 30, 30, 28, 28, 26, 26, 24, 24    \ -2 on odd levels
 
 .level_bullet_count   \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
 \todo 12 in L1 appears to cause a crash!!
-EQUB 8, 8, 12, 16, 16, 16, 16, 16
-.level_bullet_interval      \TODO this is fixed in new_bullet as 18
-EQUB 6, 8, 12, 12, 12, 12, 12, 12
+EQUB 12, 8, 12, 16, 16, 16, 16, 16
+
+.level_bullet_interval      \ this is set in new_bullet as 18, modified from this list, each level.
+EQUB 10, 8, 12, 12, 12, 12, 12, 12
+
 .level_bomb_count   \ allow up to 7 x 2 byte bombs (16 byte space in zp)
 EQUB 4, 6, 8, 10, 12, 12, 12, 12  \ max 14 bytes in table
-\.level_inb
+
 .level_bomb_interval \ bits 6,7 set bits 0-5 are counter, so &C0 + timer
 EQUB &2F,&27,&1F,&17,&0F,&0F,&0F,&0F
 \timer=0F => room for 6 to 7 on screen at rate 3
@@ -96,12 +99,13 @@ EQUB 02,03,03,03,04,04,04,04
 
 \\ Setup screen colours - load palette
   LDX #15:LDY #7
-.co1 
+.co1
+.colour_loop 
   JSR def_log_colour           \ JSR call 8 times, decrementing X, was D%
-  DEX: CPX #7:BNE co1
+  DEX: CPX #7:BNE colour_loop
 
   STX ra1          \ save X 7 in ra1
-  LDA#0: STA player_dies+1              \\ god-mode, player_dies=0, false
+  LDA #0: STA player_dies+1              \\ god-mode, player_dies=0, false
   LDA #player_live_init:STA gex+1        \\ player lives, 3
   LDA #HI(plane_sprite_addr):STA plf+1    \ LO addresses set per game frame
 
@@ -125,7 +129,9 @@ EQUB 02,03,03,03,04,04,04,04
 
 
 \\ Begin Level (next frame)
-.bf 
+.bf
+.begin_level
+{ 
   JSR cht                   \ call Change Tune, returns A=? X=?
   STX nl:INC fc:            \ increment frame counter, game level  X=7??
   \LDA de:CMP #15:BMI b0:    \ if de, difficulty < 15, go .b0  (branch if minus)
@@ -139,8 +145,12 @@ EQUB 02,03,03,03,04,04,04,04
   \ initialise lists by clearing to zero
   \ &54 bytes covers bullet_list, plane_list, bomb_list - can extend this:
   LDY #cloud_sprite_offset_list - bullet_list -1
-.b1 
-  STA bullet_list,Y: DEY: BNE b1      \ clear &54 bytes at &2D0A (bullet_list set to 0)
+  LDA#0
+.clear_bullet_list 
+  STA bullet_list,Y: DEY: BPL clear_bullet_list      \ clear &54 bytes at &2D0A (bullet_list set to 0)
+  LDY #&1F
+.clear_bomb_list
+  STA bomb_count,Y:DEY:BPL clear_bomb_list          \ clear &50 to &06F
 .b0
   LDA #12:JSR oswrch              \ OSWRCH clear the screen
   LDA #154:LDX #20:JSR osbyte     \ OSBYTE Write to video ULA control register and OS copy 
@@ -168,6 +178,8 @@ EQUB 02,03,03,03,04,04,04,04
   
   LDA level_bullet_count,Y
   STA bullet_list             \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
+  LDA level_bullet_interval,Y
+  STA bullet_interval+1       \ SMC sets immediate LDA in new_bullet
   LDA #30:                    \ TEST set to 10, 2 planes
   STA plane_list              \ allow up to 6 x 5 byte planes AF TEST was 30
 
@@ -228,6 +240,8 @@ EQUB 02,03,03,03,04,04,04,04
   JSR pp                        \ plots initial plane, 6 times
   INY:INY:CPY no:BMI slop
   JSR h7
+}
+\\ end of begin_level
 
   gun_init_screen_addr = &7E90
 .sgun                   \ Setup gun, initial screen position etc
@@ -249,11 +263,13 @@ EQUB 02,03,03,03,04,04,04,04
 \ sc = &10 : Pigeon killed (note added to stave / +10(0) points)
 \ sc = &20 : Set in mg, move_gun when hit, detected in gun_hit_display before .sor
 \ sc = &40 : Plane Wing has been hit (pigeon release / +1(0) points)
-\ sc = &80 : Level is complete (load next level / +0 points)
+\ sc = &80 : Level is complete (load next level / +0 points); set in bonsu and new_plane
 \ Output:
 \ sc is cleared = 0
 \ sc+1  increased
 \ sc+2  increased
+.end_frame 
+  EQUB  0                   \ if set to 1, then frame end, do last cycle to clear sprites (bullet, bomb)
 .score_exit
   RTS
 .sor
@@ -280,18 +296,23 @@ EQUB 02,03,03,03,04,04,04,04
 
 .s4 
   LDA #&10:BIT sc:BEQ s2
-  CLC:LDA #10 
+    CLC:LDA #10 
 .pig                          \ score for pigeon 10 => 100
   ADC sc+1:STA sc+1           \ 16 bit add dec 10 to sc+1
   LDA sc+2:ADC#0:STA sc+2
   CLD:
   JSR nxno:BNE s2             \ add next Note, check bonus?
-  JSR bon                     \ do bonus
+    JSR bon                     \ do bonus - will set score flag for next level
 
 .s2 
-  CLD:JSR exg                 \ check for extra player?
-  LDA sc:BPL s3
-  JMP ef
+  CLD:JSR exg                   \ check for extra player?
+  LDA sc:BPL s3                 \ BIT 7 is set, end of level TODO - clean up bullets
+  LDA end_frame: BNE end_level  \ first pass end_frame=0, so set to &80 and do next cycle
+    LDA #&80: STA end_frame: STA sc
+    RTS                         \ exit and allow one more cycle to clean-up sprites.
+.end_level
+  LDA#0: STA sc: STA end_frame   \ second pass, clear sc and go to next_level
+  JMP next_level
 .s3 
   LDA #0:STA sc             \ clear score byte for next cycle
                             \ fall through to display score
@@ -369,11 +390,11 @@ score_sprite_dest=&34B0
 \\ Calls delay
 .next_level
 .ef 
-  LDA #0:STA sc             \ clear score byte for next cycle
-  CLC:
+  \LDA #0:STA sc             \ clear score byte for next cycle
+  CLC
   LDA plf: ADC#&40:STA plf    \ plf = next plane from sprite address
   LDA #100:JSR delay:         \ pause
-  JMP bf                      \ play next frame/level
+  JMP begin_level                      \ play next frame/level
 \\ End of Next level setup 
 
 

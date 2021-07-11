@@ -175,14 +175,15 @@ bullet_rate=5                           \ move N pixels/lines per cycle, not cha
     INY:LDA(bulst),Y:STA sd
     INY:LDA(bulst),Y:STA sd+1:BNE bu1   \ if bulst[2] = 0 then no bullet
         INY:
-        LDA #&FE:AND bfg:STA bfg        \ clear bit 0, shows can fire again?
+        LDA #&FE:AND bfg:STA bfg        \ clear bit 0, shows can fire again.
         JMP nxbu
 .bu1 
     INY:JSR plot_fast_bullet_sprite             \ XOR undraw plot_bullet_sprite
     LDA(bulst),Y:BPL bu2                   \ if bulst[3] positive, then continue
 .bu7 
     LDA#0:STA sd+1:BEQ nxbu   \alws        \ else terminate this bullet, set bulst[2] = 0
-.bu2 
+.bu2
+    LDA sc: BMI nxbu                        \ check for frame end flag - do not redraw this bullet 
     SEC:LDA#7:AND sd:CMP#5:BMI bu3        \ move 5 bytes/pixels up
     LDA sd:SBC#5:STA sd:JMP bu4           \ either 8 bit subract 5, or
 .bu3 
@@ -203,6 +204,7 @@ bullet_rate=5                           \ move N pixels/lines per cycle, not cha
     INY                                     \ no need to save X-coord, unchanged.
     \ CPY no:BMI ntbu                       \ AF 28/6/21
     CPY no:BCC ntbu                         \ if Y<no, then loop
+    
     RTS
 }
 
@@ -221,30 +223,31 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     NOP                                 \ SMC changed to RTS, &60 in gun_hit_display
     LDA #1
     BIT bfg                             \ test can fire again?  Not used, replaced by fp0 counter?
-    BNE nwb0
+    BNE nwb0                            \ exit
     LDA #&81:LDY#&FF:LDX#&B6           \ LDX#&B6 to fix player firing  
     JSR osbyte                         \ OSBYTE 129 Read key, keyboard scan for ENTER -74
     INX:BEQ nwb1                        \ if pressed, fire
 
-    LDA #&00:STA fp0                     \ else SMC updates fp0
+    LDA #&00:STA fp0                    \ else SMC updates fp0
 .nwb0 
     RTS
 .fp0 
     EQUB 0                        \ fp0 counter modified below TODO move to ZP
 
 .nwb1 
-    LDA fp0:BEQ fp1             \ decrement counter, return if > 0
-    DEC fp0:RTS
-.fp1 
-    LDA #18:STA fp0             \ reset counter to 18
+    LDA fp0:BEQ fp1                 \ decrement counter, return if > 0
+        DEC fp0:RTS
+.fp1
+.*bullet_interval
+    LDA #18:STA fp0                 \ reset counter to 18; is modifed for each level 
     LDY #&FF                            \ proceed to fire again
 .nwb2 
-    INY:INY:INY:INY                     \  Y is 3, 7, 11  TODO DEBUG here
+    INY:INY:INY:INY                     \  Y is 3, 7, 11  TODO DEBUG here; bullet_list 8,12,16
     CPY bullet_list: BCS nwb0           \ Y>=bulst dont search beyond bullet list length
-
     LDA(bulst),Y:BNE nwb2               \ search for unused list entry, bulst[2] = 0, no check on bounds
-    DEY:DEY
-    LDA #bullet_init_y:STA(bulst),Y:    \ bulst[0] = 9D is y coord, 175 at gun tip, reducing upwards
+
+    DEY:DEY                             \ Y is 1,5,..
+    LDA #bullet_init_y:STA(bulst),Y     \ bulst[0] = 9D is y coord, 175 at gun tip, reducing upwards
     INY:SEC
     LDA gunp:SBC #&6E:STA(bulst),Y      \ 16 bit subtract from gunp bulst[1] = LO
     STA sd                              \ Initial Bullet addr is (gunp-&026E) in bulst[1,2] 
@@ -252,7 +255,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     STA sd+1:
     INY:LDA Xg:CLC:ADC #3:STA(bulst),Y   \ Bullet start X coord is (Xg+3) in bulst[3] 
     JSR plot_fast_bullet_sprite               \ first plot_bullet_sprite for new bullet
-    LDA #3:ORA bfg:STA bfg               \ set bfg bit0,1 shows 2 bullets
+    LDA #3:ORA bfg:STA bfg               \ set bfg bit 0,1 shows 2 bullets
     LDA #1:ORA sc:STA sc
     LDX #LO(sound_bullet):LDY#HI(sound_bullet)  \ OSWORD - A=7 SOUND command at &2DD0  sound_bullet
     LDA #7:JMP osword
@@ -731,11 +734,12 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
         LDA #&7F:AND bofg:STA bofg:BNE next_bomb \always   \ so mask bofg, clear top bit, show there is >0 empty slot
 .unplot 
     LDA b_addr,X
-    JSR plot_bomb                  \ undraw plot_bullet_sprite
+    JSR plot_bomb                           \ undraw plot_bullet_sprite
+    LDA sc: BMI next_bomb                        \ check for frame end flag - do not redraw this bomb 
     \\ move bomb - update addr in table
 .upper_addr
     LDA b_addr,X :AND #7
-    CMP bomb_vert_newline:BPL upper_next_line                     \ if pixel = 6 %0110 then new line
+    CMP bomb_vert_newline:BPL upper_next_line                \ if pixel = 6 %0110 then new line
         CLC:LDA b_addr,X                                     \ add 2 pixels, or add &027A
         ADC bomb_vert_rate:STA b_addr,X
         CLC:LDA b_lower_addr,X
@@ -757,7 +761,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     LDA b_addr,X
     JSR plot_bomb                  \ re-draw plot_bullet_sprite
 .next_bomb  
-    INX:INX  \ swap X and bomb addr, or INXm
+    INX:INX                                 \ next X is 2,4,6, 
     CPX bomb_max_count:BCC next_bomb_loop        \ 2,4 will equal b_addr another bomb? then loop, or exit 
     \BEQ next_bomb_loop                      \ BCC is BLT, as zero-based is less than max
     RTS                                     \ loop is 127 bytes, cannot extend!!n

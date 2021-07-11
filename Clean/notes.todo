@@ -8,6 +8,7 @@ Clean-up:
     ☐ Add bounds checks on all list scans > needs max size?
     ☐ Analyse X.bin, extract code/tables into source files.
     ☐ Working lists dont need to be in source - create in unused page on start.
+    ✔ bug when bullets left on screen at bonus end frame @done(21-07-11 18:46)
 
 Foundation:
     Simplify and improve performance to allow for new features
@@ -19,7 +20,7 @@ Foundation:
     ✔ Optimise bullet/bomb sprite to unroll, use EOR#, .. @done(21-07-06 22:58)
     ☐ Use of ZP for selected lists, flags (bullet/bomb) @started(21-07-06 22:57)
     ☐ Use of dedicated ZP locations so not reloaded each cycle. @started(21-07-06 22:57)
-    ☐ Move plane - optimise, allow for multiple planes, plane flag
+    ☐ Move plane - optimise, allow for multiple planes, plane flag @started(21-07-11 18:47)
     
 
 Features:

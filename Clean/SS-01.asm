@@ -41,32 +41,34 @@
 
 \\ Bonus routine
 \\ Bonus completed, reward by playing the tune  
-\\ Called from 
+\\ Called from score sor in SS-03
 .bon
 {
-  LDA fc:AND #3:BNE bon0    \ load frame/level counter, if 4,8,12.. 
+  LDA fc:AND #3:BNE play_short    \ load frame/level counter, if 4,8,12.. major bonus
   LDA #15:JSR delay         \ then pause, delay for 15x20 = 300ms
-  JSR stmv:JMP bon11        \ do stmv , draw tune, then play tune.
-.bon0                       \ Choose tune, based on frame counter, play tune
-  JSR cht:JSR tune
-.bon11 
-  JSR wbmsg:LDY #75:
-.bon1 
-  SED:CLC:
-  LDA sc+1:ADC#2:STA sc+1:
+  JSR stmv:JMP play_full        \ do stmv , draw tune, then play full tune.
+.play_short                       \ Choose tune, based on frame counter, play 1 part tune
+  JSR cht:JSR tune      
+.play_full                        \ full 4 part tune 
+  JSR wbmsg:
+  LDY #75                               \ 75 x 20 = 1500 bonus
+.bonus_loop                             \ slowly increment score 
+  SED:CLC
+  LDA sc+1:ADC#2:STA sc+1
   LDA sc+2:ADC#0:STA sc+2               \ Add 2 to score
   CLD
-  LDA #2:JSR delay                         \ then delay for 2x20 = 40ms
+  LDA #2:JSR delay                      \ then delay for 2x20 = 40ms
   TYA:PHA
   LDX #LO(sound_bonus):LDY#HI(sound_bonus) 
   LDA #7:JSR osword                         \ OSWORD - A=7 SOUND command at &2DF8
   JSR score_update_screen                   \ display score
-  PLA:TAY:DEY:BNE bon1
-  INC bsou                                \ why? byte 1 from &FF to 00
-  LDX #LO(bsou):LDY #HI(bsou)              \sound defined below
-  LDA #7:JSR osword                      \ OSWORD - A=7 SOUND command at bsou
+  PLA:TAY:DEY:BNE bonus_loop
+
+  INC bsou                                  \ why? byte 1 from &FF to 00
+  LDX #LO(bsou):LDY #HI(bsou)               \ sound defined below
+  LDA #7:JSR osword                         \ OSWORD - A=7 SOUND command at bsou
   DEC bsou
-  LDA #&80:ORA sc:STA sc                    \ set score flag
+  LDA #&80:ORA sc:STA sc                    \ set score flag for next level
   RTS
 }
 
