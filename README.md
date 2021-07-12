@@ -31,6 +31,15 @@ All the required files are in the Build folder only.
 The main build file is `build_birdstrike.asm` that links all the source and binary files.  This declares all the constants, variables and determines the locations at which each component is assembled or loaded.  It does contain some build instructions, for example, for a basic assembly :  `beebasm -i build_birdstrike.asm `
 
 
+## Clean source 
+The Clean folder has an improved current (2021) version of the source files.  This is very much the same game, but has many source code changes, and further comments.  These changes include making the code relocatable, more use of zero-page, simplifying the source by merging patches into the original code, better labels, and making routines more flexible.  
+
+The code to change from level to level was re-written to fix some bugs, and simplified to use a table of parameters that change (such as number of bombs, bullets, speed).  This means that these parameters can be easily changed and the game can be easily adjusted and tuned to increase difficulty & challenges.
+
+The game was run in a profiler to identify inefficient & heavily used code, and some optimisations applied.
+
+This is the best version for any further development, or for learning how the code works.  As it is largely all relocatable, changes can be made without side-effects.  Also much more of the code uses variables rather than hard-coded parameters (e.g. no & rate of bullets).
+
 ## Credits
 Huge thanks to Iain McLaren whose work to disassemble and debug the original game inspired me to start this work.  His assistance and encouragement to recover the source from my old disks motivated me to spend time rediscovering, commenting and publishing the code after a 37 year gap!
 
