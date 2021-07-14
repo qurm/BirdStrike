@@ -3,11 +3,11 @@ Clean-up:
     ✔ Change buggy level incrementing to a table model - more transparent, better to tune. @done(21-06-30 11:41)
     ✔ Consolidate sound defintions etc @done(21-06-30 12:25)
     ☐ Flags for ass build to move through levels faster (less planes)
-    ☐ Flags for god-mode similar to aid testing, experimentation @started(21-07-06 22:57)
+    ✔ Flag for god-mode similar to aid testing, experimentation @started(21-07-06 22:57) @done(21-07-14 19:43) @lasted(1w20h46m10s)
     ☐ Check use of CMP, better use of BCC, BCS for unsigned comparisons
     ☐ Add bounds checks on all list scans > needs max size?
     ☐ Analyse X.bin, extract code/tables into source files.
-    ☐ Working lists dont need to be in source - create in unused page on start.
+    ☐ Working lists dont need to be in source - create in unused page on start &400?.
     ✔ bug when bullets left on screen at bonus end frame @done(21-07-11 18:46)
 
 Foundation:

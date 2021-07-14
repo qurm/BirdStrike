@@ -187,7 +187,8 @@
       DEC ba+1:DEC sd+1       \ pass through to plotBirdSprite
 
 \\ pb Plot Bird, draws bird sprites on screen
-\\ XOR plotting loop for &17 24 bytes
+\\ XOR plotting loop for &17 24 bytes, on single MODE 2 line
+\\ Also called by plot_gun_life_indicator, top left. 
 \\ Inputs: (set above)
 \\ sf = sprite from address
 \\ sd = sprite destination address
@@ -215,6 +216,7 @@
 \\ Constants:
 
 \ gex, gun explosion is gex=&1D55 and gex+1=&1D56 
+\ plane_table (in X.bin):
 \ &1D40: 31 7A D9 7C C9 77 12 7A C8 7C BA 77 51 7A B8 7C    1zY|Iw.zH|:wQz8|
 \ &1D50: 20 7A 42 7A 00 00 00 00 00 00 00 00 00 00 00 00
 \ also X% X%=&258D
@@ -479,25 +481,25 @@ cloud_upper_dest_addr = &4180             \ 4180, 4980, 5180, 5980 ..      desti
 
 .backgnd_sprite_addr_table
     EQUB &58                  \ first is length of list, 88 bytes, 44 words
-    EQUW X_base_addr + &3A0               \ sprite source addr
+    EQUW X_base_addr + &3A0               \ sprite source addr, tree tops
     EQUW &7393, &7149, &7660, &7599, &7344, &78C9, &76B4 \ destination addrs
-    EQUW X_base_addr + &3C0               \ next sprite source addr, ...
+    EQUW X_base_addr + &3C0               \ next sprite source addr, tree mid
     EQUW &7613, &7893, &73C9, &7649, &78E0, &7844, &75C4 \ destination addrs
-    EQUW X_base_addr + &3E0      \&1CE0
+    EQUW X_base_addr + &3E0      \&1CE0   tree base
     EQUW &7B13, &7B4A, &7B60, &7AC4
-    EQUW X_base_addr + &400      \&1D00
+    EQUW X_base_addr + &400      \&1D00   roof
     EQUW &78B0, &7820, &785C
-    EQUW X_base_addr + &420      \&1D20
+    EQUW X_base_addr + &420      \&1D20   damaged roof
     EQUW &7800, &7688
-    EQUW X_base_addr + &460      \&1D60 
+    EQUW X_base_addr + &460      \&1D60   church clock
     EQUW &7060
-    EQUW X_base_addr + &480      \&1D80
+    EQUW X_base_addr + &480      \&1D80   church wall
     EQUW &72E0, &7560, &77E0, &7A80, &7AA0, &7ADC
-    EQUW X_base_addr + &4A0      \&1DA0 
+    EQUW X_base_addr + &4A0      \&1DA0   church door
     EQUw &7A60, &7B30
-    EQUW X_base_addr + &4C0      \&1DC0 
+    EQUW X_base_addr + &4C0      \&1DC0   house
     EQUW &7908
-    EQUW X_base_addr + &4E0      \&1DE0 
+    EQUW X_base_addr + &4E0      \&1DE0   house ruin
     EQUw &7928
     EQUB &00
 

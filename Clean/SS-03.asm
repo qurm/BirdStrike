@@ -51,16 +51,20 @@
   EQUS "(c)A.E.Frigaard 1984 Hello!"
 
 \\ Define lists for any parameters changing over 8 levels
-\\ USed in ..  uses Level 8 for all subsequent
-.level_de
-EQUB 30, 30, 28, 28, 26, 26, 24, 24    \ -2 on odd levels
+\\ Must have values as multiples shown
+\\ Used in ..  uses Level 8 for all subsequent
+
+.level_de           \ delta tracking, was -2 on odd levels originally
+\\ values near 0 are perfect tracking of player by the plane
+EQUB 32, 30, 28, 26, 24, 22, 20, 18   
+\EQUB 32, 30, 28, 28, 26, 26, 24, 24
 
 .level_bullet_count   \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
 \todo 12 in L1 appears to cause a crash!!
-EQUB 12, 8, 12, 16, 16, 16, 16, 16
+EQUB 6, 8, 10, 12, 14, 16, 16, 16
 
 .level_bullet_interval      \ this is set in new_bullet as 18, modified from this list, each level.
-EQUB 10, 8, 12, 12, 12, 12, 12, 12
+EQUB 12, 10, 08, 08, 08, 08, 08, 08
 
 .level_bomb_count   \ allow up to 7 x 2 byte bombs (16 byte space in zp)
 EQUB 4, 6, 8, 10, 12, 12, 12, 12  \ max 14 bytes in table
@@ -70,7 +74,7 @@ EQUB &2F,&27,&1F,&17,&0F,&0F,&0F,&0F
 \timer=0F => room for 6 to 7 on screen at rate 3
 \timer=1C => room for 4 on screen; rate 3 will need to fall faster too.
 .level_bomb_rate \ bits 6,7 set bits 0-5 are counter, so &C0 + timer
-EQUB 02,03,03,03,04,04,04,04
+EQUB 03,03,03,03,04,04,04,04
 
 \\ Start new game, was .S%
 \\ Intialise variables, setup screem
@@ -105,7 +109,7 @@ EQUB 02,03,03,03,04,04,04,04
   DEX: CPX #7:BNE colour_loop
 
   STX ra1          \ save X 7 in ra1
-  LDA #0: STA player_dies+1              \\ god-mode, player_dies=0, false
+  LDA #1: STA player_dies+1              \\ god-mode, player_dies=0, false
   LDA #player_live_init:STA gex+1        \\ player lives, 3
   LDA #HI(plane_sprite_addr):STA plf+1    \ LO addresses set per game frame
 
@@ -164,6 +168,7 @@ EQUB 02,03,03,03,04,04,04,04
 
   \\ new level intialisation AF 29/6/21
   LDY fc: DEY               \ zero based , first level=0
+                      \TODO cap the level at 8  ADN#7
   LDA level_de,Y: STA de
   LDA level_bomb_interval,Y: ORA#&C0  \set bits 6,7
   STA inb: \ LDA#&3F: 

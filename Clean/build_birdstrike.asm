@@ -89,13 +89,17 @@ b_lower_addr=&62   \AF 3/7/2021
 X_base_addr = &2100 
 PRINT "X_base_addr = ", ~X_base_addr
 
-explosion_sprite_addr  = X_base_addr + &040          \ base for 3 animated sprites &30 long
-mini_gun_sprite_addr= X_base_addr + &010               \ temp player gun sprite &1928 or &1910
+explosion_sprite_addr  = X_base_addr + &040          \ base for 3 animated plane expl sprites &30 long
+mini_gun_sprite_addr= X_base_addr + &010             \ temp player gun sprite &1928 or &1910
 
 bullet_sprite_addr  = X_base_addr + &100             \bullet simple sprite
-other_sprite_addr  = X_base_addr + &110             \todo this is gun?
+other_sprite_addr  = X_base_addr + &110             \ animated gun explosion, 3 x &28 = &78
 pigl_sprite_addr = X_base_addr + &100            \ Bird Sprites, Flying Left?  L=>R, on single page 
 pigr_sprite_addr = X_base_addr + &200    \ &1B00 \ Bird Sprites, Flying Right?  R=>L, on single page
+\ bird each is &18 bytes, 5 images = &78
+\ offsets are  $88,$A0,$B8,$D0,$E8  so next free is 1F0
+\ dead bird sprite at &270
+\ 200 to 270 appear unused.
 
 tm=X_base_addr + &108     \ tm used in stmv as temp store of fc 
                 \ tm+1 used for number of active 'bomb slots'
@@ -104,18 +108,22 @@ tm=X_base_addr + &108     \ tm used in stmv as temp store of fc
 \ gunf=&2F00          \ used in .gun, value is modified by .sgun
 gunf=X_base_addr + &160
 
-score_sprite_base= X_base_addr + &300
-plane_table = X_base_addr + &440      \ in X.bin file
-
-picn=X_base_addr + &454        \ different value in PIGSRCE !!
-gex=X_base_addr + &455           \ gun explosion timer, used in gun_hit_display to show correct sprite
-                        \ gex+1 is current no of lives
-                        \ gex +2,3  is LO,HI screen address for mini gun indicator
-player_live_init = 3
-
+score_sprite_base= X_base_addr + &300 \300 to 3A0
+\ see backgnd_sprite_addr_table  3A0 to 4FF, except 440 to 460 used below
+\ pre-populated
+plane_table = X_base_addr + &440      \ 440 to 453 in X.bin file, used in PIG-02 plane_hit
+\ zero initial values 454 to 45F
+picn=X_base_addr + &454               \ different value in PIGSRCE !!
+gex=X_base_addr + &455                \ gun explosion timer, used in gun_hit_display to show correct sprite
+                                      \ gex+1 is current no of lives
+                                      \ gex+2,3 is LO,HI screen address for mini gun indicator
 not = X_base_addr + &459    \ note sprite origin , not+1
 plane_kill_count = X_base_addr + &45B
 fc = X_base_addr + &45C
+\ 460 to   churhs a similar.
+
+player_live_init = 3
+
 PRINT ".picn = ", ~picn
 
 
