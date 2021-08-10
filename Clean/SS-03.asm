@@ -12,8 +12,14 @@
 
 
 \ org     $1E00          \ "P%" as per the original source
+.start_SS_03
+PRINT ".start_SS_03 = ", ~start_SS_03
 \\ Game entry point here
 .game
+  \ Close the open boot file, required if loading over DFS workspace at &1100
+  \ https://stardot.org.uk/forums/viewtopic.php?f=74&t=23054&p=329177&hilit=close%230#p329177
+  LDA #0:TAY:JSR osfind 
+
   \ Set Escape Disabled
   LDA #200:LDX #03:LDY #0:JSR osbyte    \OSBYTE &C8 (200) *FX 200 Read/write ESCAPE, BREAK 
   JSR space             
@@ -21,8 +27,8 @@
   \ Added AF 6/6/2021
   LDX #&01: LDA #&04: LDY #&00
   JSR osbyte                  \ OSBYTE 04 Disable cursor editing, X=1
-  LDA &20C:STA soun:          \ save OSWORD vector to .soun
-  LDA &20D:STA soun+1
+  LDA WORDvA :STA soun:          \ save OSWORD vector to .soun, &020C
+  LDA WORDvB :STA soun+1
 
 .newgame 
   JSR gend                  \ display title screen
@@ -34,13 +40,16 @@
 .GO           
   JSR random1               \ update "random" numbers for use later R%      
   JSR scr                   \ wait for vsync timing 
+  \ LDA #&00+(1 EOR 7):STA &FE21    \show red indicator for start sprite drawing
   JSR mp                    \ Move planes, mp
   JSR np                    \ New plane, np
+  
   JSR mg                    \ Move gun, mg, player moves?m
   JSR mb                    \ Move bullet
   JSR nb                    \ New bullet, nb, player fires?
   JSR move_bombs            \ Move bombs
   JSR new_bomb              \ New bombs nbo  
+  \ LDA #&00+(0 EOR 7):STA &FE21   \clear red indicator for end sprite drawing
   JSR pg                    \ Move bird, was B%
   JSR gun_hit_display       \ Player Hit processing, was H%
   JSR sor                   \ gravestones, score?
@@ -60,8 +69,8 @@ EQUB 32, 30, 28, 26, 24, 22, 20, 18
 \EQUB 32, 30, 28, 28, 26, 26, 24, 24
 
 .level_bullet_count   \ allow up to 4 x 4 byte bullets - must modify list length too, 6,10, 8?
-\todo 12 in L1 appears to cause a crash!!
-EQUB 6, 8, 10, 12, 14, 16, 16, 16
+\original game starts with 2 bullets
+EQUB 8, 8, 10, 12, 14, 16, 16, 16
 
 .level_bullet_interval      \ this is set in new_bullet as 18, modified from this list, each level.
 EQUB 12, 10, 08, 08, 08, 08, 08, 08
@@ -148,7 +157,9 @@ EQUB 03,03,03,03,04,04,04,04
 
   \ initialise lists by clearing to zero
   \ &54 bytes covers bullet_list, plane_list, bomb_list - can extend this:
-  LDY #cloud_sprite_offset_list - bullet_list -1
+  \ LDY #cloud_sprite_offset_list - bullet_list -1
+  LDY #last_list - bullet_list -1
+  
   LDA#0
 .clear_bullet_list 
   STA bullet_list,Y: DEY: BPL clear_bullet_list      \ clear &54 bytes at &2D0A (bullet_list set to 0)
@@ -314,7 +325,8 @@ EQUB 03,03,03,03,04,04,04,04
   LDA sc:BPL s3                 \ BIT 7 is set, end of level TODO - clean up bullets
   LDA end_frame: BNE end_level  \ first pass end_frame=0, so set to &80 and do next cycle
     LDA #&80: STA end_frame: STA sc
-    RTS                         \ exit and allow one more cycle to clean-up sprites.
+    \RTS                         \ TODO bug exit and allow one more cycle to clean-up sprites.
+    JMP s3
 .end_level
   LDA#0: STA sc: STA end_frame   \ second pass, clear sc and go to next_level
   JMP next_level
@@ -535,8 +547,8 @@ score_sprite_dest=&34B0
 .keyboardScan
 .key 
   LDA #&81:LDY #&FF:JSR osbyte      \ OSBYTE 129 Read key, keyboard scan for X (value?)
-  INX:RTS                           \ X is &FF is pressed, so INX to 0, return
-\ INX:RTS               \ AF 7/6/21 added padding to align diffs, dead code
+  INX:RTS                           \ X is &FF if pressed, so INX to 0, return
+                                    \ X is 00 if not pressed
 
 \\ Check Key presses for user input
 \\ Called from main loop after all screen routines, moved from SS-01
@@ -544,29 +556,41 @@ score_sprite_dest=&34B0
 \\ Note this writes OSWORD vector at &20C, turning sound on and off.
 \\ checking for R, S, Q on keyboard
 .check_key_press
- 
+
 {
-  DEC keycounter                    \ optimise - check key every N cycles
-  BNE checkKeyComplete
-  LDA #5:STA keycounter
+\  DEC keycounter                    \ optimise - check key every N cycles
+\  BNE checkKeyComplete
+\  LDA #5:STA keycounter
 .checkQkey
   LDX #&EF:JSR key:BNE checkSkey          \ EF=-17 INKEY Q, Quiet
-  LDA #LO(mute):STA &20C                  \ rewrite OSWORD vector to below .mute
-  LDA #HI(mute):STA &20D
+  LDA #LO(mute):STA WORDvA  \&20C                  \ rewrite OSWORD vector to below .mute
+  LDA #HI(mute):STA WORDvB  \&20D
  
 .checkSkey
   LDX #&AE:JSR key:BNE checkRkey           \ AE=-82 INKEY S, Sound
-  LDA soun:STA &20C:
-  LDA soun+1:STA &20D
+  LDA soun:STA WORDvA \&20C
+  LDA soun+1:STA WORDvB \&20D
  
 .checkRkey
-  LDX #&CC:JSR key:BNE checkKeyComplete          \ CC=-52 INKEY R, Rest
+  LDX #&CC:JSR key:BNE checkKeyComplete     \ CC=-52 INKEY R, Rest
+  \\ http://www.retrosoftware.co.uk/wiki/index.php?title=Reading_the_keyboard_by_direct_hardware_access
+  \\LDA #&7F:STA &FE43
+  \\SEI
+  \\LDA #&0F:STA &FE42   \ allow write to addressable latch
+  \\LDA #&03:STA &FE40   \ set bit 3 to 0
 .op3  
-  LDA #&81:LDY #1:LDX #0:JSR osbyte:  \OSBYTE 129 Read key, scan for 1s, keyboard scan for X (value?)
-  BCS op3:        \If Carry is set, no key, loop
-  CPX #82:        \82 = R
-  BEQ op3         \If R pressed, loop, else RTS
+  \\LDA #51:STA &FE4F:LDA &FE4F  \ N flag = whether 'R' pressed
+  \\BMI op5
+  \\JMP op3
+  LDA #&81:LDY #1:LDX #255:JSR osbyte        \ OSBYTE 129 Read key, scan for 255cs, keyboard scan for X (value?)
+    \\ TODO - bug does not return form this.
+
+  BCS op3:                \ If Carry is set, no key, loop
+  CPX #82:                \ Carry clear, X=character, 82 = R
+  BEQ op3                 \ If R pressed, loop, else RTS
+  
 .op5 
+  \\CLI
 .checkKeyComplete
   RTS
 
@@ -577,7 +601,7 @@ EQUB 1
 .mu1 
   JMP(soun)
 }
-\TODO move this to a memory location, is populated on game startup
+\TODO move this to a ZP memory location, is populated on game startup
 .soun                               \ OSWORD vector restored from here
   EQUW &E7EB
 \\ End of Check Key presses for user input

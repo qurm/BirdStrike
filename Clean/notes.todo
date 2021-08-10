@@ -6,7 +6,7 @@ Clean-up:
     ✔ Flag for god-mode similar to aid testing, experimentation @started(21-07-06 22:57) @done(21-07-14 19:43) @lasted(1w20h46m10s)
     ☐ Check use of CMP, better use of BCC, BCS for unsigned comparisons
     ☐ Add bounds checks on all list scans > needs max size?
-    ☐ Analyse X.bin, extract code/tables into source files.
+    ☐ Analyse X.bin, extract code/tables into source files. @started(21-07-25 18:35)
     ☐ Working lists dont need to be in source - create in unused page on start &400?.
     ✔ bug when bullets left on screen at bonus end frame @done(21-07-11 18:46)
 
@@ -25,14 +25,16 @@ Foundation:
 
 Features:
     ☐ Night mode levels - hide some plane features, spotlights? moon, stars
-    ☐ Cloud movement - draw boundaries in black to give impression of movement.
+    ☐ Cloud movement - re-draw boundaries in black to give impression of movement.
     ☐ Cloud enhancement - more, multiples clouds to hide planes etc.
     ☐ Bird movement - more complexity, rise/fall
     ☐ Plane - show smoke as indicator of winged; change pattern; clear at bottom.
     ☐ Plane - more homing behaviour - dive bomb, ascend / descend with physics.
-    ☐ Other special flying feature, similar to pigeon, to drive power-up, score.
+    ☐ Other special flying feature, similar to pigeon, to drive power-up, score. biplane, or friend + enemy biplanes, balloon
     ☐ Some form of power-up (more bullets, faster bullets) for player.
     ☐ Protective shield as power-up (in trench)
+    ☐ Church crosses are retained from level to level.
+    ☐ Scenery some animation?  Flowing stream.
 
 
 Code Efficiency:
@@ -40,7 +42,7 @@ Code Efficiency:
     https://stardot.org.uk/forums/viewtopic.php?f=4&t=21875&p=310100&hilit=code+profiler&sid=ec9fc8d99d722804f6bb6a7009c93151#p310100
 
     ✔ Score is writing 5 sprites each cycle - only needed on change. @done(21-06-30 20:41)
-    ☐ gun position is XOR plotting each cycle - only needed on move.  Needs changes to collission detection
+    ☐ gun position is XOR plotting each cycle - only needed on move.  Needs changes to collision detection
     ☐ plot_plane loop high - large sprite, always moving or waste?.
     ☐ keyboardScan loop high - always moving or waste?.
     ☐ tune t3 loop high - seems odd waste?.

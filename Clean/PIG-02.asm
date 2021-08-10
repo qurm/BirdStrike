@@ -13,7 +13,8 @@
 
 
 \ 15/6/21 now includes background scenery data as EQUB (was in G-Scene.bin)
-
+.start_PIG_02
+PRINT ".start_PIG_02 = ", ~start_PIG_02
 
 \ Note list and Tune list source of music.
 \ nl=&2382    \ Note list &30 bytes, zero-terminated lists, 13,14,11,8

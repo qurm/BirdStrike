@@ -26,8 +26,8 @@
 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 
-WORDvA  = $020C        \ WRCH vector A
-WORDvB  = $020D        \ WRCH vector B
+WORDvA  = $020C        \ WORD vector A
+WORDvB  = $020D        \ WORD vector B
 
 WRCHvA  = $020E        \ WRCH vector A
 WRCHvB  = $020F        \ WRCH vector B
@@ -35,21 +35,41 @@ WRCHvB  = $020F        \ WRCH vector B
 EVNTvA  = $0220        \ EVNT vector A
 EVNTvB  = $0221        \ EVNT vector B
 
-LFE4D   = $FE4D        \ Interrupt Flag Register
-LFE4E   = $FE4E        \ Interrupt Enable Register
+\\ #FE40-5F is the 6522 System VIA
 SysViaRegB = &FE40
 SysViaDDRA = &FE43
-SysViaIFR  = &FE4D
-SysViaIER  = &FE4E
+SysViaIFR  = &FE4D      \ Interrupt Flag Register
+SysViaIER  = &FE4E      \ Interrupt Enable Register
 SysViaRegA = &FE4F
 
 vector_table_low_byte    = $FFB7    \ Vector table address low byte
 vector_table_high_byte   = $FFB8    \ Vector table address high byte
 
+osfind  = &FFCE        \ OSFIND
 osasci  = $FFE3        \ OSASCI
 oswrch  = $FFEE        \ OSWRCH
 osword  = $FFF1        \ OSWORD
 osbyte  = $FFF4        \ OSBYTE
+
+; physical colours
+black   = 0
+red     = 1
+green   = 2
+yellow  = 3
+blue    = 4
+magenta = 5
+cyan    = 6
+white   = 7
+
+black_r   = %00000000
+red_r     = %00000001
+green_r   = %00000100
+yellow_r  = %00000101
+blue_r    = %00010000
+magenta_r = %00010001
+cyan_r    = %00010100
+white_r   = %00010101
+white_l   = %00101010
 
 \ Zero Page locations
 no=&70:       \ number used in bombs too - generic counter
@@ -86,9 +106,8 @@ b_lower_addr=&62   \AF 3/7/2021
 \ Sprites memory locations - now defined in constants in source
 \ $.X is loaded at &1900 (scenery sprites etc - not clouds/enemies)
 \ $.X       001900 001900 000500         &1900 + &0500 = &1E00
-X_base_addr = &2100 
-PRINT "X_base_addr = ", ~X_base_addr
 
+X_base_addr = &2200 
 explosion_sprite_addr  = X_base_addr + &040          \ base for 3 animated plane expl sprites &30 long
 mini_gun_sprite_addr= X_base_addr + &010             \ temp player gun sprite &1928 or &1910
 
@@ -100,6 +119,14 @@ pigr_sprite_addr = X_base_addr + &200    \ &1B00 \ Bird Sprites, Flying Right?  
 \ offsets are  $88,$A0,$B8,$D0,$E8  so next free is 1F0
 \ dead bird sprite at &270
 \ 200 to 270 appear unused.
+
+\ this is all zeroed in start_game ( was 2D0A to 2D5E)
+\ AF 27/6/2021 added 2 more entries, 8 bytes total 17
+\ pointer to this in zero page bulst=&8A
+\ TODO this could relocate to a low page, &D00
+bullet_list = X_base_addr + &200          \ 1 and 4 x 4 = 17
+plane_list = X_base_addr + &211           \ 1 and 10 x 5 = 51
+last_list  = X_base_addr + &244
 
 tm=X_base_addr + &108     \ tm used in stmv as temp store of fc 
                 \ tm+1 used for number of active 'bomb slots'
@@ -124,12 +151,12 @@ fc = X_base_addr + &45C
 
 player_live_init = 3
 
-PRINT ".picn = ", ~picn
+\\PRINT ".picn = ", ~picn
 
 
-ORG &1100
-.start_SS_01
-\ 1400 to 15BE
+ORG &1200
+
+
 INCLUDE "SS-01.asm"
 \ with HSTRS data to &1776 
 \ MODE 7 High score and Keys, Space to start.
@@ -160,27 +187,19 @@ INCLUDE "GG-01.asm"             \ derived from $.G source binary
 \ was 21EE to 2222
 \ new to &1AEF
 \ draw_stave only, very short
+\ Notes, bomb, gun sprites
+\ ORG &2000 within
+\ was INCBIN "G-Note.bin"         \ sprite and data file &2300 to &2380, &80 bytes
 
-\ ORG &2300
-ORG &2000
-\ align to page
-\\note_sprite_addr=&2300
-\bomb_sprite_addr=&2350
-\gun_sprite_addr=&2358       \ (normal) gunf=&1A60 (explosion)
-note_sprite_addr=&2000
-bomb_sprite_addr=&2050
-gun_sprite_addr=&2058       \ (normal) gunf=&1A60 (explosion)
-INCBIN "G-Note.bin"         \ sprite and data file &2300 to &2380, &80 bytes
-                            \ Notes, bomb, gun sprites
-                            \ derived from $.G source binary
-\unused 2380  from 2382 is note list, .nl
-\TODO this is very small, can relocate
-.end_G_Note
-PRINT ".end_G_Note = ", ~end_G_Note
+\\.end_G_Note
+\\PRINT ".end_G_Note = ", ~end_G_Note
 
 
+PRINT "X_base_addr = ", ~X_base_addr
 \ORG &1900
 ORG X_base_addr
+.start_X
+PRINT ".start_X = ", ~start_X
 INCBIN "X.bin"          \ sprite, data, variables file &1900 to &1E00, &500 bytes
                         \ pigeon/score font/scenery/player sprites
                         \ derived from $.X source binary
@@ -189,7 +208,8 @@ PRINT ".end_X = ", ~end_X
 
 
 \ ORG &281D
-ORG &2600
+\ ORG &2600
+\ ALIGN &100
 INCLUDE "GG-02.asm"
 \ starts at .def_log_colour
 \ 281D to 2D09

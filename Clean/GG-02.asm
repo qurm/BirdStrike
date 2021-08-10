@@ -12,6 +12,8 @@
 \   Move bombs,..
 \   Data structures for above, lists, pointers, variables, constants
 
+.start_GG_02
+PRINT ".start_GG_02 = ", ~start_GG_02
 
 \\ Define logical colours palette
 \\ Calls oswrch
@@ -49,15 +51,19 @@
     BNE def_envelopes
     RTS
 
-.scr                    \ waits for Vsync?
-    LDA #&02
-    STA &FE4E           \ Interrupt Enable Register
+\\ waits for the 50Hz vsync signal
+\\ can comment this out, just RTS to run at full speed.
+.scr                            \ waits for Vsync?
+    LDA #&02       \&02            \  A=%100000010 (disable vsync interrupt)
+    STA SysViaIER       \&FE4E           \ Interrupt Enable Register
 .scri
-    BIT &FE4D           \ Interrupt Flag Register
+    BIT SysViaIFR       \&FE4D           \ Interrupt Flag Register
     BEQ scri            \ loop until interrupt
-    LDA #&82
-    STA &FE4E           \ Interrupt Enable Register
+    LDA #&82        \&82             \  A=%100000010 (enable vsync interrupt, keyboard)
+    STA SysViaIER        \ &FE4E           \ Interrupt Enable Register
     RTS
+\.scr
+\    LDA #&13:JSR osbyte             \ waits for Vsync
 
 \\ Plot score using custom sprites
 \\ Input:
@@ -84,13 +90,13 @@
 \\ Called from main loop
 \\ No check for collision with bomb
 \\ Updates: Xg (x-coord), gunp (screen memory pos)
-\\ TODO optimised to only call unplot if is moving
+\\ optimised to only call unplot if is moving
 .mg
 .move_gun
 {
     NOP                                 \ SMC set to RTS to disable
     JSR plot_gun_sprite                 \ unplot 
-    LDA #&81:LDY #&FF:LDX #&BD          \ http://beebwiki.mdfs.net/OSBYTE_%2681
+    LDA #&81:LDY #&FF:LDX #&BD          \ http://beebwiki.mdfs.net/OSBYTE_%2681 read key "X"
     JSR osbyte                          \ check for "X" move right
     INX:BEQ right
     DEY:LDX #&9E:JSR osbyte             \ check for "Z" move left
@@ -221,28 +227,27 @@ bullet_rate=5                           \ move N pixels/lines per cycle, not cha
 {
 bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun tip, reducing upwards
     NOP                                 \ SMC changed to RTS, &60 in gun_hit_display
-    LDA #1
-    BIT bfg                             \ test can fire again?  Not used, replaced by fp0 counter?
-    BNE nwb0                            \ exit
-    LDA #&81:LDY#&FF:LDX#&B6           \ LDX#&B6 to fix player firing  
-    JSR osbyte                         \ OSBYTE 129 Read key, keyboard scan for ENTER -74
+\    LDA #1
+ \   BIT bfg                             \ test can fire again?  Not used, replaced by fp0 counter?
+ \   BNE nwb0                            \ exit
+    LDA #&81:LDY#&FF:LDX#&B6            \ LDX #&B6 to check player firing  
+    JSR osbyte                          \ OSBYTE 129 Read key, keyboard scan for ENTER -74
     INX:BEQ nwb1                        \ if pressed, fire
-
-    LDA #&00:STA fp0                    \ else SMC updates fp0
+    LDA #&00:STA fp0                    \ else reset counter to 0; updates fp0 SMC
 .nwb0 
-    RTS
+   RTS
 .fp0 
-    EQUB 0                        \ fp0 counter modified below TODO move to ZP
+    EQUB 0                              \ fp0 counter modified below TODO move to ZP
 
 .nwb1 
-    LDA fp0:BEQ fp1                 \ decrement counter, return if > 0
+    LDA fp0:BEQ fp1                     \ decrement counter, return if > 0
         DEC fp0:RTS
 .fp1
 .*bullet_interval
-    LDA #18:STA fp0                 \ reset counter to 18; is modifed for each level 
+    LDA #18:STA fp0                     \ reset counter to 18; is modifed for each level SMC
     LDY #&FF                            \ proceed to fire again
 .nwb2 
-    INY:INY:INY:INY                     \  Y is 3, 7, 11  TODO DEBUG here; bullet_list 8,12,16
+    INY:INY:INY:INY                     \  Y is 3, 7, 11 
     CPY bullet_list: BCS nwb0           \ Y>=bulst dont search beyond bullet list length
     LDA(bulst),Y:BNE nwb2               \ search for unused list entry, bulst[2] = 0, no check on bounds
 
@@ -254,48 +259,45 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     INY:LDA gunp+1:SBC #2:STA(bulst),Y  \ bulst[2] = HI
     STA sd+1:
     INY:LDA Xg:CLC:ADC #3:STA(bulst),Y   \ Bullet start X coord is (Xg+3) in bulst[3] 
-    JSR plot_fast_bullet_sprite               \ first plot_bullet_sprite for new bullet
-    LDA #3:ORA bfg:STA bfg               \ set bfg bit 0,1 shows 2 bullets
-    LDA #1:ORA sc:STA sc
+    JSR plot_fast_bullet_sprite          \ first plot_bullet_sprite for new bullet
+    \LDA #3:ORA bfg:STA bfg               \ set bfg bit 0,1 shows 2 bullets
+    LDA #1:ORA sc:STA sc                 \ show that bullet fired, not used in score currently
     LDX #LO(sound_bullet):LDY#HI(sound_bullet)  \ OSWORD - A=7 SOUND command at &2DD0  sound_bullet
     LDA #7:JMP osword
 }
 
 \\ s5 Sprite/screen memory movement for bombs, bullets?
 \\ uses fast EOR plotting, from sf, to st & sd (across 2 MODE 2 rows) 
-\\ Profiler shows this loop is fairly heavy cycle count
-\\ TODO - change to 
 \\ called from mbo, Move Bombs,  Move player bullets, shared
 \\ input is zero-page sd, sf address pointers; Y index
 \\ output is zero-page st, address pointers and mod?
 \\ Y is preserved because nb uses as loop counter
 \\ Profiler shows this loop is fairly heavy cycle count
 \\ TODO - change to 
-\\ dedicate ZP for table and use LDA(bulst,X)
+\\ dedicate ZP for bullet table and use LDA(bulst,X)
 \\ set Y as parameter
 .plot_fast_bullet_sprite
 {
     bullet_sprite_length=&05  
     TYA:PHA:                        \ save Y
     LDY #bullet_sprite_length       \ 6 bytes per bullet/bomb
-    \LDX #&2A                        \?? temp white
+ 
     CLC:
     LDA sd:ADC #&78:STA st:         \ add 1 row, &0278 and store in st
-    \LDA sd:ADC #&78:TAX         \ add 1 row, &0278 and store in st
     LDA sd+1:ADC #2:STA st+1
-    LDA sd:AND#7:EOR#7:STA comp_mod+1      \ modulo, save a few cycles
+    LDA sd:AND#7:EOR#7:STA comp_mod+1      \ modulo, save a few cycles SMC
     CMP #5:BPL top                  \ if all pixels are in top line, go to top
 .bot 
-    LDA(st),Y:             \AF optimise?
-    EOR#&2A:STA(st),Y
-    DEY                 \ Y-1, loop until = mod
+    LDA(st),Y               \ AF optimise?
+    EOR #white_l:STA(st),Y
+    DEY                     \ Y-1, loop until = mod
 .comp_mod
-    CPY#&FF:BNE bot          \ SMC -not FF, set above.    
+    CPY#&FF:BNE bot         \ SMC -not FF, set above.    
 .top 
-    LDA(sd),Y:
-    EOR#&2A:STA(sd),Y
+    LDA(sd),Y
+    EOR #white_l:STA(sd),Y
     DEY:BPL top             \ Y-1, loop until 0
-    PLA:TAY:                \ restore Y
+    PLA:TAY                 \ restore Y
     RTS
 }
 
@@ -344,10 +346,9 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
     LDA #&40:STA plf:           \ set LO plane sprite 
     JSR pp:JMP reset_sp_addr
 .px1 
-    \ TODO align to published, as LDA #&40, was LDX #&0
     CMP #12:BNE px2
     LDA #&40:STA plf         \ set LO plane sprite 
-    JSR pp:                     \TODO - repeats here?  no px4
+    JSR pp            
     LDA #&80:STA plf         \ set LO plane sprite 
     JSR pp:JMP reset_sp_addr
 .px2 
@@ -438,7 +439,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ Logic for random Left/Right and following player
 \\ Calls pxp, pp to determine sprite and plot
 \\ TODO - not efficient to copy all to zp if not moving this plane
-\\ TODo - plane stil moves after explosion - more realistic?
+\\ TODO - plane still moves after explosion - more realistic?
 .mp
 .move_planes
 { 
@@ -684,9 +685,10 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ calling code to INC plot_bomb_lower1, plot_bomb_lower2, etc
 \\ uses Y only, so X used in calling code loop
 \\ pass in A = LO address to calc mod
+\\ original bomb sprite at &2050:  01 04 04 01 01 01        \01 is red
+bomb_sprite_byte=red_r  \%00000100                    \maybe in ZP? change per sprite?
+bullet_sprite_length=&05  
 .plot_bomb
-    bomb_sprite_byte=&2A                    \maybe in ZP? change per sprite?
-    bullet_sprite_length=&05  
     LDY #bullet_sprite_length               \ 6 bytes per bullet/bomb
     AND#7:EOR#7:STA plot_bomb_mod+1         \ Calc mod. A=b_addr,X from calling code, SMC
     CMP #5:BPL plot_bomb_upper1                  \ if all pixels are in top line, go to top
@@ -694,7 +696,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
  
 .plot_bomb_lower1                       \ plot pixels on lower screen line MODE 2
     LDA(b_lower_addr),Y:             \ SMC b_lower_addr is modified by calling code, &62, &64
-    EOR #bomb_sprite_byte
+    EOR #red_r                          \ bomb_sprite_byte is red_r
 .plot_bomb_lower2
     STA(b_lower_addr),Y
     DEY                                 \ Y-1, loop until Y = mod
@@ -703,7 +705,7 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 
 .plot_bomb_upper1                       \ plot pixels on upper screen line MODE 2
     LDA(b_addr),Y:
-    EOR #bomb_sprite_byte
+    EOR #white_r         \&15            \ white mode 2
 .plot_bomb_upper2 
     STA(b_addr),Y
     DEY:BPL plot_bomb_upper1             \ Y-1, loop until 0
@@ -714,8 +716,8 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 \\ Profiler shows this routine/loop is moderately important to optimise.
 \\ bomb moves 2 pixels per cycle  sd AND #7 is 0,2,4,6
 \\ uses memory addresses, no X,Y.
-\\ TO DO - vary pixels per cycle rate, maybe vary with gravity.
-\\ TO DO add Y- coord, use for bottom detect and collision - do we need it?
+\\ TODO - vary pixels per cycle rate, maybe vary with gravity.
+\\ TODO add Y- coord, use for bottom detect and collision - do we need it?
 .move_bombs 
 {
     NOP                     \ RTS or NOP
@@ -777,6 +779,10 @@ bullet_init_y=&9D                       \ bulst[0] = 9D is y coord, 175 at gun t
 .end_GG_02_code
 PRINT ".end_GG_02_code = ", ~end_GG_02_code
 
+ORG &2D56           \ some space
+.start_GG_02_data
+PRINT ".start_GG_02_data = ", ~start_GG_02_data
+
 \\ bomb movement parameters used in Move bomb, updated per level
 \\ TODO - could move to ZP if space.
 .bomb_vert_rate         \ from 1 to 7.  8 may work to test!
@@ -791,16 +797,17 @@ EQUB &02
 
 
 \\ Fixed postion
-\ ORG &2D02
-ORG &2CF0           \ some space
+
+\ORG &2CF0           \ some space
+
 \ this is all zeroed in start_game 2D0A to 2D5E
 \ AF 27/6/2021 added 2 more entries, 8 bytes total 17
-.bullet_list                \ pointer to this in zero page bulst=&8A
-    EQUB &08                \ contains max no of bullets 8
-    EQUB &00,&00,&00,&00        \ exp, screen address sd, sd+1
-    EQUB &00,&00,&00,&00
-    EQUB &00,&00,&00,&00
-    EQUB &00,&00,&00,&00
+\.bullet_list                \ pointer to this in zero page bulst=&8A
+\    EQUB &08                \ contains max no of bullets 8
+\    EQUB &00,&00,&00,&00        \ exp, screen address sd, sd+1
+\    EQUB &00,&00,&00,&00
+\    EQUB &00,&00,&00,&00
+\    EQUB &00,&00,&00,&00
 
   \\ plane_list,1 count, 5 bytes per plane, 6 to 10, Total 51
   \ 81, LO, HI, ?, ?
@@ -812,21 +819,21 @@ ORG &2CF0           \ some space
   \ 81 48 3B A9 D0
   \ 81 98 3B B3 D0
   \ 81 E8 3B BD D0
-.plane_list                 \ was pls_addr=&2D13 
-    EQUB &1E      \ TEST AF was &1E = 6 planes, &F = 3 planes
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00,&00,&00,&00,&00
-    EQUB &00                    \ padding
-.plX
-    EQUB &00,&00,&00,&00,&00,&00,&00,&00
+\.plane_list                 \ was pls_addr=&2D13 
+\    EQUB &1E      \ TEST AF was &1E = 6 planes, &F = 3 planes
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00,&00,&00,&00,&00
+\    EQUB &00                    \ padding
+\.plX
+\    EQUB &00,&00,&00,&00,&00,&00,&00,&00
 \ IFM - L2D47 - sprite pointers? Maybe more?
 
 \ORG &2D47
@@ -839,6 +846,7 @@ ORG &2CF0           \ some space
 \        EQUB    $00,$00,$00,$00,$00,$00,$00,$00
 
 \.L2D5F
+
 .cloud_sprite_offset_list
         EQUB    $80,$40,$40,$00,$80,$00,$40,$80
         EQUB    $00

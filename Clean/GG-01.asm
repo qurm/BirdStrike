@@ -12,6 +12,9 @@
 \ I think &.OLDSOURCE is fairly definitive for &286E-&2D09 
 \ (.mg to the start of the workspace / data areas at the top of the game).
 
+.start_GG_01
+PRINT ".start_GG_01 = ", ~start_GG_01
+
 \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 \\ dissassembly from G binary
 \\ new labels align to Iains 
@@ -50,5 +53,31 @@
     EQUB &19, &01, &00, &03, &00, &00   \ PLOT K, X, Y
     EQUB &19, &00, &00, &fd, &f0, &ff   \ PLOT K, X, Y
 }
+
+
+\\ Notes, bomb, gun sprites
+\\ derived from $.G source binary
+\\note_sprite_addr=&2000
+\\bomb_sprite_addr=&2050
+\\gun_sprite_addr=&2058       \ (normal) gunf=&1A60 (explosion)
+
+\ align to page
+\\ equivalent of INCBIN "G-Note.bin"         \ sprite and data file originally at &2300 to &2380, &80 bytes
+\ORG &2000
+ALIGN &100
+
+.note_sprite_addr
+EQUB &00,&00,&00,&00,&00,&14,&3C,&3C,&38,&38,&38,&38,&38,&38,&38,&20
+EQUB &00,&00,&00,&00,&00,&14,&38,&3C,&38,&38,&38,&38,&38,&38,&38,&00
+EQUB &00,&00,&00,&00,&00,&14,&38,&3C,&00,&00,&00,&00,&00,&38,&38,&20
+EQUB &00,&00,&00,&00,&00,&38,&38,&30,&00,&00,&00,&00,&00,&00,&00,&00
+EQUB &00,&00,&00,&00,&00,&3C,&3C,&10,&00,&00,&00,&00,&00,&38,&38,&30
+.bomb_sprite_addr
+EQUB &01,&04,&04,&01,&01,&01,&00,&00
+.gun_sprite_addr
+EQUB &00,&04,&04,&04,&2C,&04,&04,&04
+EQUB &00,&00,&00,&14,&3C,&14,&14,&00,&28,&28,&28,&3D,&3E,&3E,&3C,&28
+EQUB &00,&04,&04,&04,&2C,&04,&04,&04,&00,&00,&00,&00,&28,&00,&00,&00
+
 .end_GG_01
 PRINT ".end_GG-01 = ", ~end_GG_01

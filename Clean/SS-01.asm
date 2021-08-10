@@ -10,7 +10,8 @@
 \   Game entry screen, logo, high score in MODE 7 teletext data
 
 \ ORG  $1400          \ "P%" as per the original source
-
+.start_SS_01
+PRINT ".start_SS_01 = ", ~start_SS_01
   \ AF: Last few chars of this string may have been used for padding to adjust some location
   EQUS "Thanks David,Ian,Martin,Mum,Dad,Susi C"
 
@@ -85,13 +86,13 @@
 }
 
 \\ Start of HSTRS file, MODE 7 bytes
-\\
+\\ TODO - can copy all this to a low page on load.
 \\ nbk Name parameter Block for OSWORD call to read user name
 .nbk    \=&15C0       \EQUB    $B4,$16,$08,$20,$7F
 EQUB &B4, &16, &08, &20, &7F
 \\ High Score, 3 bytes, Initially 0200 00
 .hs    \=&15C5
-EQUB &00, &00, &02
+EQUB &00, &01, &00
 \\ Mode 7 title screen
 .m7     \=&15C8
 EQUB &16, &07, &17, &00, &0A, &20, &00, &00

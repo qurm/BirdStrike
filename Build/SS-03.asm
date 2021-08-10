@@ -33,7 +33,9 @@
   JSR scr                   \ wait for vsync timing 
   JSR mp                    \ Move planes, mp
   JSR np                    \ New plane, np
+  LDA #&00+(1EOR7):STA &FE21
   JSR mg                    \ Move gun, mg, player moves?m
+  LDA #&00+(0EOR7):STA &FE21
   JSR mb                    \ Move bullet
   JSR nb                    \ New bullet, nb, player fires?
   JSR mbo                   \ Move bombs
